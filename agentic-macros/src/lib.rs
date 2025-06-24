@@ -57,3 +57,39 @@ fn parse_methods(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
         vec![ #(#methods),* ]
     }
 }
+
+#[proc_macro_attribute]
+pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(item as syn::ItemImpl);
+
+    let self_ty = &input.self_ty;
+    let mut match_arms = Vec::new();
+
+    for item in &input.items {
+        if let syn::ImplItem::Fn(method) = item {
+            let method_name = method.sig.ident.to_string();
+            let ident = &method.sig.ident;
+
+            match_arms.push(quote! {
+                #method_name => {
+                    self.#ident();
+                }
+            });
+        }
+    }
+
+    let generated = quote! {
+        #input
+
+        impl AgentGuest for #self_ty {
+            fn invoke(&self, method_name: &str, _input: Vec<String>) {
+                match method_name {
+                    #(#match_arms,)*
+                    _ => println!("Unknown method: {}", method_name),
+                }
+            }
+        }
+    };
+
+    generated.into()
+}

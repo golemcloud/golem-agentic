@@ -13,4 +13,4 @@ proc-macro = true
 golem-agentic = { path = "../agentic", version = "0.0.0", default-features = false }
 syn = { version = "2", features = ["full"] }
 quote = "1"
-proc-macro2 = "1"
+proc-macro2 = "1.0.94"
