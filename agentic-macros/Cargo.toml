@@ -14,3 +14,5 @@ golem-agentic = { path = "../agentic", version = "0.0.0", default-features = fal
 syn = { version = "2", features = ["full"] }
 quote = "1"
 proc-macro2 = "1.0.94"
+lazy_static = "1.5.0"
+

@@ -3,14 +3,19 @@ use proc_macro::TokenStream;
 
 use quote::quote;
 
+#[allow(unused_imports)]
+use lazy_static::lazy_static;
+use golem_agentic::exports::golem::agentic::guest::GuestAgent;
+
+
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let tr = syn::parse_macro_input!(item as syn::ItemTrait);
     let meta = parse_methods(&tr);
     let generated = quote! {
         #tr
-        lazy_static! {
-          static ref __AGENT_META: AgentDefinition = #meta;
+        ::lazy_static::lazy_static!{
+          static ref __AGENT_META: Vec<::golem_agentic::exports::golem::agentic::guest::AgentDefinition> = #meta;
         }
     };
     generated.into()
@@ -43,9 +48,11 @@ fn parse_methods(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
             }
 
             Some(quote! {
-                MethodDefinition {
-                    name: stringify!(#name),
+                golem_agentic::exports::golem::agentic::guest::AgentDefinition {
+                    agent_name: stringify!(#name).to_string(),
                     description: #description.to_string(),
+                    methods: vec![],
+                    requires: vec![]
                 }
             })
         } else {
