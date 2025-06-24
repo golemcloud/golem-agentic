@@ -78,7 +78,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
             match_arms.push(quote! {
                 #method_name => {
                     let result: String = self.#ident();
-                    ::golem_agentic::exports::golem::agentic::guest::StatusUpdate::Emit(result.to_string())
+                    ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate::Emit(result.to_string())
                 }
             });
         }
@@ -89,7 +89,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
 
 
-        impl ::golem_agentic::exports::golem::agentic::guest::GuestAgent for #self_ty {
+        impl ::golem_agentic::binding::exports::golem::agentic::guest::GuestAgent for #self_ty {
             fn invoke(&self, method_name: String, _input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
                 match method_name.as_str() {
                     #(#match_arms,)*
