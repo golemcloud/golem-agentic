@@ -7,6 +7,7 @@ homepage = "https://golem.cloud"
 description = "SDK that helps build agentic components in a code first manner"
 
 [lib]
+proc-macro = true
 path = "src/lib.rs"
 crate-type = ["rlib"]
 

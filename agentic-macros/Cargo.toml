@@ -1,0 +1,16 @@
+[package]
+name = "golem-agentic-macros"
+version = "0.0.0"
+edition = "2021"
+license = "Apache-2.0"
+homepage = "https://golem.cloud"
+description = "SDK that helps build agentic components in a code first manner"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+golem-agentic = { path = "../agentic", version = "0.0.0", default-features = false }
+syn = { version = "2", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"

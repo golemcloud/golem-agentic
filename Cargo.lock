@@ -341,6 +341,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "golem-agentic-macros"
+version = "0.0.0"
+dependencies = [
+ "golem-agentic",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "golem-rust"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

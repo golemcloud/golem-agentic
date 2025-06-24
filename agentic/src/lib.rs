@@ -6,5 +6,3 @@ wit_bindgen::generate!({
     additional_derives: [PartialEq, golem_rust::FromValueAndType, golem_rust::IntoValue],
     pub_export_macro: true,
 });
-
-
