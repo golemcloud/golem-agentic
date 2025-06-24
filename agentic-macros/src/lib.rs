@@ -16,9 +16,6 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     generated.into()
 }
 
-
-use syn::{TraitItem};
-
 fn parse_methods(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     let methods = tr.items.iter().filter_map(|item| {
         if let syn::TraitItem::Fn(trait_fn) = item {
@@ -37,7 +34,8 @@ fn parse_methods(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
                         } else {
                             Err(meta.error("expected `description = \"...\"`"))
                         }
-                    }).ok();
+                    })
+                    .ok();
                     if let Some(val) = found {
                         description = val;
                     }
@@ -59,4 +57,3 @@ fn parse_methods(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
         vec![ #(#methods),* ]
     }
 }
-
