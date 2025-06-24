@@ -5,8 +5,6 @@ use quote::quote;
 
 #[allow(unused_imports)]
 use lazy_static::lazy_static;
-use golem_agentic::exports::golem::agentic::guest::GuestAgent;
-
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -15,7 +13,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let generated = quote! {
         #tr
         ::lazy_static::lazy_static!{
-          static ref __AGENT_META: Vec<::golem_agentic::exports::golem::agentic::guest::AgentDefinition> = #meta;
+          static ref __AGENT_META: Vec<::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition> = #meta;
         }
     };
     generated.into()
@@ -48,7 +46,7 @@ fn parse_methods(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
             }
 
             Some(quote! {
-                golem_agentic::exports::golem::agentic::guest::AgentDefinition {
+                golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
                     agent_name: stringify!(#name).to_string(),
                     description: #description.to_string(),
                     methods: vec![],
@@ -79,7 +77,8 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
             match_arms.push(quote! {
                 #method_name => {
-                    self.#ident();
+                    let result: String = self.#ident();
+                    ::golem_agentic::exports::golem::agentic::guest::StatusUpdate::Emit(result.to_string())
                 }
             });
         }
@@ -88,15 +87,22 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     let generated = quote! {
         #input
 
-        impl AgentGuest for #self_ty {
-            fn invoke(&self, method_name: &str, _input: Vec<String>) {
-                match method_name {
+        impl ::golem_agentic::exports::golem::agentic::guest::GuestAgent for #self_ty {
+            fn invoke(&self, method_name: String, _input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
+                match method_name.as_str() {
                     #(#match_arms,)*
-                    _ => println!("Unknown method: {}", method_name),
+                    _ => panic!("Unknown method: {}", method_name),
                 }
             }
+
+            fn new(_: String, _: String) -> Self { todo!() }
+
+            fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition { todo!() }
         }
+
+
     };
 
     generated.into()
 }
+
