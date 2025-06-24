@@ -1,0 +1,25 @@
+[package]
+name = "golem-agentic"
+version = "0.0.0"
+edition = "2021"
+license = "Apache-2.0"
+homepage = "https://golem.cloud"
+description = "SDK that helps build agentic components in a code first manner"
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+golem-rust = { workspace = true }
+log = { workspace = true }
+mime = "0.3.17"
+nom = { version = "7.1", default-features = false }
+reqwest = { workspace = true }
+thiserror = "2.0.12"
+wasi-logger = "0.1.2"
+wit-bindgen = { version = "0.40.0" }
+
+[features]
+default = ["durability"]
+durability = ["golem-rust/durability"]
