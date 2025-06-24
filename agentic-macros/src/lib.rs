@@ -87,6 +87,8 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     let generated = quote! {
         #input
 
+
+
         impl ::golem_agentic::exports::golem::agentic::guest::GuestAgent for #self_ty {
             fn invoke(&self, method_name: String, _input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
                 match method_name.as_str() {
