@@ -1,6 +1,5 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
-
 use quote::quote;
 
 #[allow(unused_imports)]
@@ -10,16 +9,26 @@ use lazy_static::lazy_static;
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let tr = syn::parse_macro_input!(item as syn::ItemTrait);
     let meta = parse_methods(&tr);
-    let generated = quote! {
-        #tr
-        ::lazy_static::lazy_static!{
-          static ref __AGENT_META: Vec<::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition> = #meta;
+    let register_fn = quote! {
+        #[::ctor::ctor]
+        fn register_agent_definition() {
+            golem_agentic::agent_registry::register_agent_definition(
+               #meta
+            );
         }
     };
-    generated.into()
+
+    let result = quote! {
+        #tr
+        #register_fn
+    };
+
+    result.into()
 }
 
 fn parse_methods(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
+    let agent_name = tr.ident.to_string();
+
     let methods = tr.items.iter().filter_map(|item| {
         if let syn::TraitItem::Fn(trait_fn) = item {
             let name = &trait_fn.sig.ident;
@@ -46,11 +55,20 @@ fn parse_methods(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
             }
 
             Some(quote! {
-                golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
-                    agent_name: stringify!(#name).to_string(),
+                golem_agentic::binding::exports::golem::agentic::guest::AgentMethod {
+                    name: stringify!(#name).to_string(),
                     description: #description.to_string(),
-                    methods: vec![],
-                    requires: vec![]
+                    prompt_hint: None,
+                    input_schema: ::golem_agentic::binding::exports::golem::agentic::guest::DataSchema::Structured(::golem_agentic::binding::exports::golem::agentic::guest::Structured {
+                          parameters:vec![::golem_agentic::binding::exports::golem::agentic::guest::ParameterType::Text(::golem_agentic::binding::exports::golem::agentic::guest::TextType {
+                            language_code: "abc".to_string(),
+                          })],
+                    }),
+                    output_schema: ::golem_agentic::binding::exports::golem::agentic::guest::DataSchema::Structured(::golem_agentic::binding::exports::golem::agentic::guest::Structured {
+                      parameters:vec![::golem_agentic::binding::exports::golem::agentic::guest::ParameterType::Text(::golem_agentic::binding::exports::golem::agentic::guest::TextType {
+                       language_code: "".to_string(),
+                      })],
+                    }),
                 }
             })
         } else {
@@ -59,7 +77,12 @@ fn parse_methods(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     });
 
     quote! {
-        vec![ #(#methods),* ]
+        golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
+            agent_name: #agent_name.to_string(),
+            description: "".to_string(), // Optionally pull from attr
+            methods: vec![#(#methods),*],
+            requires: vec![]
+        }
     }
 }
 
@@ -87,7 +110,15 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     let generated = quote! {
         #input
 
+        struct Component;
 
+         impl ::golem_agentic::binding::exports::golem::agentic::guest::Guest for Component {
+           type Agent = crate::#self_ty;
+
+            fn discover_agent_definitions() -> Vec<::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition> {
+              todo!()
+            }
+         }
 
         impl ::golem_agentic::binding::exports::golem::agentic::guest::GuestAgent for #self_ty {
             fn invoke(&self, method_name: String, _input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
@@ -101,6 +132,9 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
             fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition { todo!() }
         }
+
+        ::golem_agentic::binding::export!(Component with_types_in ::golem_agentic::binding);
+
 
 
     };

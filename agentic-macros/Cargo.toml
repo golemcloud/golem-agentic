@@ -15,4 +15,4 @@ syn = { version = "2", features = ["full"] }
 quote = "1"
 proc-macro2 = "1.0.94"
 lazy_static = "1.5.0"
-
+ctor = "0.4.2"
