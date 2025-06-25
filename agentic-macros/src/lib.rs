@@ -92,6 +92,22 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
     let self_ty = &input.self_ty;
 
+    let mut match_arms = Vec::new();
+
+    for item in &input.items {
+        if let syn::ImplItem::Fn(method) = item {
+            let method_name = method.sig.ident.to_string();
+            let ident = &method.sig.ident;
+
+            match_arms.push(quote! {
+                #method_name => {
+                    let result: String = self.#ident();
+                    ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate::Emit(result.to_string())
+                }
+            });
+        }
+    }
+
     let register_impl_fn = quote! {
         #[::ctor::ctor]
         fn register_agent_impl() {
@@ -102,7 +118,18 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     };
 
     let base_impl = quote! {
-        impl golem_agentic::agent::Agent for #self_ty {}
+        impl golem_agentic::agent::Agent for #self_ty {
+            fn raw_agent_id(&self) -> String {
+                #self_ty.to_string()
+            }
+
+            fn invoke(&self, method_name: String, _input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
+                match method_name.as_str() {
+                    #(#match_arms,)*
+                    _ => panic!("Unknown method: {}", method_name),
+                }
+            }
+        }
     };
 
     let result = quote! {
