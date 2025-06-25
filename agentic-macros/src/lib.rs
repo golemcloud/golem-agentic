@@ -134,9 +134,6 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
 
         ::golem_agentic::binding::export!(Component with_types_in ::golem_agentic::binding);
-
-
-
     };
 
     generated.into()
