@@ -94,9 +94,9 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
     let register_impl_fn = quote! {
         #[::ctor::ctor]
-        fn register_agent_definition() {
+        fn register_agent_impl() {
             golem_agentic::agent_registry::register_agent_impl(
-               Box::new(#self_ty)
+               ::std::sync::Arc::new(#self_ty)
             );
         }
     };
