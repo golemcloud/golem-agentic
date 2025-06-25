@@ -120,6 +120,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
             }
          }
 
+        // self_ty is the agent implementation
         impl ::golem_agentic::binding::exports::golem::agentic::guest::GuestAgent for #self_ty {
             fn invoke(&self, method_name: String, _input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
                 match method_name.as_str() {
