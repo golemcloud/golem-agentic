@@ -91,52 +91,26 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     let input = syn::parse_macro_input!(item as syn::ItemImpl);
 
     let self_ty = &input.self_ty;
-    let mut match_arms = Vec::new();
 
-    for item in &input.items {
-        if let syn::ImplItem::Fn(method) = item {
-            let method_name = method.sig.ident.to_string();
-            let ident = &method.sig.ident;
-
-            match_arms.push(quote! {
-                #method_name => {
-                    let result: String = self.#ident();
-                    ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate::Emit(result.to_string())
-                }
-            });
+    let register_impl_fn = quote! {
+        #[::ctor::ctor]
+        fn register_agent_definition() {
+            golem_agentic::agent_registry::register_agent_impl(
+               Box::new(#self_ty)
+            );
         }
-    }
-
-    let generated = quote! {
-        #input
-
-        struct Component;
-
-         impl ::golem_agentic::binding::exports::golem::agentic::guest::Guest for Component {
-           type Agent = crate::#self_ty;
-
-            fn discover_agent_definitions() -> Vec<::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition> {
-              todo!()
-            }
-         }
-
-        // self_ty is the agent implementation
-        impl ::golem_agentic::binding::exports::golem::agentic::guest::GuestAgent for #self_ty {
-            fn invoke(&self, method_name: String, _input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
-                match method_name.as_str() {
-                    #(#match_arms,)*
-                    _ => panic!("Unknown method: {}", method_name),
-                }
-            }
-
-            fn new(_: String, _: String) -> Self { todo!() }
-
-            fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition { todo!() }
-        }
-
-        ::golem_agentic::binding::export!(Component with_types_in ::golem_agentic::binding);
     };
 
-    generated.into()
+    let base_impl = quote! {
+        impl golem_agentic::agent::Agent for #self_ty {}
+    };
+
+    let result = quote! {
+        #input
+        #base_impl
+        #register_impl_fn
+    };
+
+    result.into()
 }
 
