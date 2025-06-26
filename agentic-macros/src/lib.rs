@@ -1,17 +1,23 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
-use quote::quote;
+use std::any::Any;
+use std::fmt::format;
+use quote::{format_ident, quote, ToTokens};
 
 #[allow(unused_imports)]
 use lazy_static::lazy_static;
+use proc_macro2::{Ident, Span};
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let tr = syn::parse_macro_input!(item as syn::ItemTrait);
+    let fn_suffix = tr.ident.to_string().to_lowercase();
+    let fn_name = format_ident!("register_agent_definition_{}", fn_suffix);
+
     let meta = parse_methods(&tr);
     let register_fn = quote! {
         #[::ctor::ctor]
-        fn register_agent_definition() {
+        fn #fn_name() {
             golem_agentic::agent_registry::register_agent_definition(
                #meta
             );
@@ -108,9 +114,16 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     }
 
+    let ty_name = match &**self_ty {
+        syn::Type::Path(p) => p.path.segments.last().unwrap().ident.to_string(),
+        _ => "unknown_impl".to_string(),
+    };
+
+    let fn_name = format_ident!("register_agent_impl_{}", ty_name.to_lowercase());
+
     let register_impl_fn = quote! {
         #[::ctor::ctor]
-        fn register_agent_impl() {
+        fn #fn_name() {
             golem_agentic::agent_registry::register_agent_impl(
                ::std::sync::Arc::new(#self_ty)
             );
