@@ -22,4 +22,5 @@ use crate::binding::exports::golem::agentic::guest::{AgentDefinition, StatusUpda
 pub trait Agent: Send + Sync {
     fn raw_agent_impl_name(&self) -> String;
     fn invoke(&self, method_name: String, input: Vec<String>) -> StatusUpdate;
+    fn get_definition(&self) -> AgentDefinition;
 }

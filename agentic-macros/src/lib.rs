@@ -8,7 +8,9 @@ use lazy_static::lazy_static;
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let tr = syn::parse_macro_input!(item as syn::ItemTrait);
-    let fn_suffix = tr.ident.to_string().to_lowercase();
+    let tr_name = tr.ident.clone();
+    let tr_name_str = tr_name.to_string();
+    let fn_suffix = &tr_name.to_string().to_lowercase();
     let fn_name = format_ident!("register_agent_definition_{}", fn_suffix); // may be ctor is not required. But works now
 
     let meta = get_agent_definition(&tr);
@@ -17,7 +19,8 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
         #[::ctor::ctor]
         fn #fn_name() {
             golem_agentic::agent_registry::register_agent_definition(
-               #meta
+               #tr_name_str.to_string(),
+                #meta
             );
         }
     };
@@ -97,6 +100,22 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
 pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemImpl);
 
+
+    let trait_name = if let Some((_bang, path, _for_token)) = &input.trait_ {
+        // Get the last segment of the path — the trait name
+        &path.segments.last().unwrap().ident
+
+    } else {
+        return syn::Error::new_spanned(
+            &input.self_ty,
+            "Expected an implementation of a trait, but found none.",
+        )
+            .to_compile_error()
+            .into();
+    };
+
+    let trait_name_str = trait_name.to_string();
+
     let self_ty = &input.self_ty;
 
     let mut match_arms = Vec::new();
@@ -104,27 +123,33 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     for item in &input.items {
         if let syn::ImplItem::Fn(method) = item {
             let method_name = method.sig.ident.to_string();
-            let params = method.sig.inputs.iter()
-                .map(|arg| quote! { #arg })
-                .collect::<Vec<_>>();
 
-            let args = method
-                .sig.inputs.iter()
+            let param_idents: Vec<_> = method.sig.inputs.iter()
                 .filter_map(|arg| {
                     if let syn::FnArg::Typed(pat_ty) = arg {
-                        Some(&*pat_ty.pat)
-                    } else {
-                        None
-                    }
+                        if let syn::Pat::Ident(pat_ident) = &*pat_ty.pat {
+                            Some(pat_ident.ident.clone())
+                        } else { None }
+                    } else { None }
                 })
-                .map(|pat| quote! { #pat.clone() })
-                .collect::<Vec<_>>();
+                .collect();
+
+            let extraction = param_idents.iter().enumerate().map(|(i, ident)| {
+                quote! {
+                 let #ident = input
+                  .get(#i)
+                  .expect("missing argument")
+                  .clone();
+                }
+            });
 
             let ident = &method.sig.ident;
 
             match_arms.push(quote! {
                 #method_name => {
-                    let result: String = self.#ident(#(#args),*);
+                    // extract them
+                    #(#extraction)*
+                    let result: String = self.#ident(#(#param_idents),*);
                     ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate::Emit(result.to_string())
                 }
             });
@@ -153,11 +178,16 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
                 #self_ty.to_string()
             }
 
-            fn invoke(&self, method_name: String, _input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
+            fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
                 match method_name.as_str() {
                     #(#match_arms,)*
                     _ => panic!("Unknown method: {}", method_name),
                 }
+            }
+
+            fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
+                golem_agentic::agent_registry::get_agent_def_by_name(&#trait_name_str)
+                    .expect("Agent definition not found")
             }
         }
     };
@@ -172,7 +202,6 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
                 ::golem_agentic::agent_registry::get_all_agent_definitions()
             }
         }
-
 
         impl ::golem_agentic::binding::exports::golem::agentic::guest::GuestAgent for #self_ty {
             fn new(agent_name: String, agent_id: String) -> Self {
