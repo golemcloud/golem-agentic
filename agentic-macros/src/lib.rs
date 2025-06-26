@@ -94,24 +94,20 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     }
 }
 
-
-
 #[proc_macro_attribute]
 pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemImpl);
 
-
     let trait_name = if let Some((_bang, path, _for_token)) = &input.trait_ {
         // Get the last segment of the path — the trait name
         &path.segments.last().unwrap().ident
-
     } else {
         return syn::Error::new_spanned(
             &input.self_ty,
             "Expected an implementation of a trait, but found none.",
         )
-            .to_compile_error()
-            .into();
+        .to_compile_error()
+        .into();
     };
 
     let trait_name_str = trait_name.to_string();
@@ -124,13 +120,20 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         if let syn::ImplItem::Fn(method) = item {
             let method_name = method.sig.ident.to_string();
 
-            let param_idents: Vec<_> = method.sig.inputs.iter()
+            let param_idents: Vec<_> = method
+                .sig
+                .inputs
+                .iter()
                 .filter_map(|arg| {
                     if let syn::FnArg::Typed(pat_ty) = arg {
                         if let syn::Pat::Ident(pat_ident) = &*pat_ty.pat {
                             Some(pat_ident.ident.clone())
-                        } else { None }
-                    } else { None }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
                 })
                 .collect();
 
@@ -227,7 +230,5 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         #final_component_quote
     };
 
-
     result.into()
 }
-
