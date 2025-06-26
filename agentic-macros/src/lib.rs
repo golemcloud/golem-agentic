@@ -91,6 +91,8 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     }
 }
 
+
+
 #[proc_macro_attribute]
 pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemImpl);
@@ -102,11 +104,27 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     for item in &input.items {
         if let syn::ImplItem::Fn(method) = item {
             let method_name = method.sig.ident.to_string();
+            let params = method.sig.inputs.iter()
+                .map(|arg| quote! { #arg })
+                .collect::<Vec<_>>();
+
+            let args = method
+                .sig.inputs.iter()
+                .filter_map(|arg| {
+                    if let syn::FnArg::Typed(pat_ty) = arg {
+                        Some(&*pat_ty.pat)
+                    } else {
+                        None
+                    }
+                })
+                .map(|pat| quote! { #pat.clone() })
+                .collect::<Vec<_>>();
+
             let ident = &method.sig.ident;
 
             match_arms.push(quote! {
                 #method_name => {
-                    let result: String = self.#ident();
+                    let result: String = self.#ident(#(#args),*);
                     ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate::Emit(result.to_string())
                 }
             });
@@ -131,7 +149,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
     let base_impl = quote! {
         impl golem_agentic::agent::Agent for #self_ty {
-            fn raw_agent_id(&self) -> String {
+            fn raw_agent_impl_name(&self) -> String {
                 #self_ty.to_string()
             }
 
@@ -166,7 +184,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
             }
 
             fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
-                todo!("Implement get_definition for GuestAgent")
+                todo!("not done yet")
             }
         }
 

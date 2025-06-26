@@ -1,4 +1,4 @@
-use crate::binding::exports::golem::agentic::guest::StatusUpdate;
+use crate::binding::exports::golem::agentic::guest::{AgentDefinition, StatusUpdate};
 
 // A simple Agent that every agent abstraction has to extend
 //
@@ -22,5 +22,4 @@ use crate::binding::exports::golem::agentic::guest::StatusUpdate;
 pub trait Agent: Send + Sync {
     fn raw_agent_impl_name(&self) -> String;
     fn invoke(&self, method_name: String, input: Vec<String>) -> StatusUpdate;
-
 }
