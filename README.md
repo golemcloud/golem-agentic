@@ -8,3 +8,12 @@ In short, the tooling, data types and corresponding APIs to develop AI apps are 
 While dynamic in nature to satisfy AI protocols, users can write **type-safe** code.
 
 This is _**NOT**_ automatic WIT generation based on user code. This implies, we disallow leaking anything about WIT into user's development flow
+
+
+## Build
+
+```shell
+cargo build
+```
+
+Refer to golem-agentic-examples repo. Examples are kept separate to keep it clean and simple.
