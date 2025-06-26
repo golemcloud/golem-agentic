@@ -1,3 +1,5 @@
+use crate::binding::exports::golem::agentic::guest::{Guest, GuestAgent};
+
 wit_bindgen::generate!({
     path: "wit",
     world: "agentic",
@@ -6,4 +8,3 @@ wit_bindgen::generate!({
     additional_derives: [PartialEq, golem_rust::FromValueAndType, golem_rust::IntoValue],
     pub_export_macro: true,
 });
-
