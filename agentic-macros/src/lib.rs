@@ -213,7 +213,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
             }
 
             fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
-                todo!("not done yet")
+                golem_agentic::agent::Agent::get_definition(&#self_ty)
             }
         }
 
