@@ -9,9 +9,9 @@ use lazy_static::lazy_static;
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let tr = syn::parse_macro_input!(item as syn::ItemTrait);
     let fn_suffix = tr.ident.to_string().to_lowercase();
-    let fn_name = format_ident!("register_agent_definition_{}", fn_suffix);
+    let fn_name = format_ident!("register_agent_definition_{}", fn_suffix); // may be ctor is not required. But works now
 
-    let meta = parse_methods(&tr);
+    let meta = get_agent_definition(&tr);
     let register_fn = quote! {
         #[::ctor::ctor]
         fn #fn_name() {
@@ -29,7 +29,8 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     result.into()
 }
 
-fn parse_methods(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
+// Extract AgentDefinition from an abstract agent definition
+fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     let agent_name = tr.ident.to_string();
 
     let methods = tr.items.iter().filter_map(|item| {
@@ -39,7 +40,7 @@ fn parse_methods(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
 
             // Look for a #[description = "..."] attribute
             for attr in &trait_fn.attrs {
-                if attr.path().is_ident("description") {
+                if attr.path().is_ident("description") { // some plugins to ensure discription is set mandatorily will avoid bugs in AI agents
                     let mut found = None;
                     attr.parse_nested_meta(|meta| {
                         if meta.path.is_ident("description") {
@@ -69,7 +70,7 @@ fn parse_methods(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
                     }),
                     output_schema: ::golem_agentic::binding::exports::golem::agentic::guest::DataSchema::Structured(::golem_agentic::binding::exports::golem::agentic::guest::Structured {
                       parameters:vec![::golem_agentic::binding::exports::golem::agentic::guest::ParameterType::Text(::golem_agentic::binding::exports::golem::agentic::guest::TextType {
-                       language_code: "".to_string(),
+                       language_code: "".to_string(), // TODO: Din't understand what exactly this is.
                       })],
                     }),
                 }
