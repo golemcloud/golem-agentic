@@ -4,7 +4,7 @@ use quote::{format_ident, quote};
 
 #[allow(unused_imports)]
 use lazy_static::lazy_static;
-use syn::parse;
+use syn::{parse, parse_macro_input, Data, DeriveInput, Fields};
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -217,4 +217,71 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     };
 
     result.into()
+}
+
+// Default constructor for agent structs
+#[proc_macro_derive(AgentConstructor)]
+pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    let struct_ident = input.ident.clone();
+    let generics = input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let fields = match input.data {
+        Data::Struct(data_struct) => match data_struct.fields {
+            Fields::Named(fields_named) => fields_named.named,
+            _ => {
+                return syn::Error::new_spanned(
+                    data_struct.struct_token,
+                    "Only named fields are supported",
+                )
+                    .to_compile_error()
+                    .into();
+            }
+        },
+        _ => {
+            return syn::Error::new_spanned(
+                input.ident.to_string(),
+                "AgentConstructor can only be derived for structs",
+            )
+                .to_compile_error()
+                .into();
+        }
+    };
+
+    let mut extra_let_bindings = Vec::new();
+    let mut extra_struct_fields = Vec::new();
+
+
+    for field in fields.iter() {
+        let field_ident = field.ident.as_ref().unwrap();
+        let field_ty = &field.ty;
+        let name_str = field_ident.to_string();
+
+        if name_str == "agent_id" || name_str == "agent_name" {
+            // Skip putting these in struct init list
+            continue;
+        }
+
+        extra_let_bindings.push(quote! {
+        let #field_ident: #field_ty = #field_ty::new(agent_id.clone(), agent_name.clone());
+    });
+
+        extra_struct_fields.push(quote! { #field_ident });
+    }
+    let expanded = quote! {
+        impl #impl_generics #struct_ident #ty_generics #where_clause {
+            pub fn new(agent_id: String, agent_name: String) -> Self {
+                #(#extra_let_bindings)*
+                Self {
+                    agent_id,
+                    agent_name,
+                    #(#extra_struct_fields),*
+                }
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
 }
