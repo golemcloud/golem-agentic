@@ -4,7 +4,7 @@ version = "0.0.0"
 edition = "2021"
 license = "Apache-2.0"
 homepage = "https://golem.cloud"
-description = "SDK that helps build agentic components in a code first manner"
+description = "Core of agentic SDK helps write golem components with zero knowledge on webassembly"
 
 [lib]
 path = "src/lib.rs"
