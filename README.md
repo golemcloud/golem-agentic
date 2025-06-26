@@ -16,4 +16,5 @@ This is _**NOT**_ automatic WIT generation based on user code. This implies, we 
 cargo build
 ```
 
-Refer to golem-agentic-examples repo. Examples are kept separate to keep it clean and simple.
+Refer to [golem-agentic-examples](https://github.com/golemcloud/golem-agentic-examples) repo.
+These examples will become templates in golem-cli soon.
