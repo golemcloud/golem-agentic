@@ -142,11 +142,42 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     };
 
+    let final_component_quote = quote! {
+        struct Component;
+
+        impl ::golem_agentic::binding::exports::golem::agentic::guest::Guest for Component {
+            type Agent = #self_ty;
+
+            fn discover_agent_definitions() -> Vec<::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition> {
+                ::golem_agentic::agent_registry::get_all_agent_definitions()
+            }
+        }
+
+
+        impl ::golem_agentic::binding::exports::golem::agentic::guest::GuestAgent for #self_ty {
+            fn new(agent_name: String, agent_id: String) -> Self {
+                #self_ty
+            }
+
+            fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
+                golem_agentic::agent::Agent::invoke(&#self_ty, method_name, input)
+            }
+
+            fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
+                todo!("Implement get_definition for GuestAgent")
+            }
+        }
+
+      ::golem_agentic::binding::export!(Component with_types_in ::golem_agentic::binding);
+    };
+
     let result = quote! {
         #input
         #base_impl
         #register_impl_fn
+        #final_component_quote
     };
+
 
     result.into()
 }
