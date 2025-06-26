@@ -12,6 +12,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = format_ident!("register_agent_definition_{}", fn_suffix); // may be ctor is not required. But works now
 
     let meta = get_agent_definition(&tr);
+
     let register_fn = quote! {
         #[::ctor::ctor]
         fn #fn_name() {

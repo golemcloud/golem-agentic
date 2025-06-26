@@ -1,7 +1,26 @@
 use crate::binding::exports::golem::agentic::guest::StatusUpdate;
 
 // A simple Agent that every agent abstraction has to extend
+//
+// We never want to directly implement this trait
+// Example usage:
+//
+// ```
+//  [agent_definition]
+//  trait WeatherAgent: Agent {
+//    fn get_weather(&self, location: String) -> String;
+//  }
+// ```
+//
+//  ```
+//  struct MyWeatherAgent;
+//
+//  #[agent_implementation]
+//  impl WeatherAgent for MyWeatherAgent {fn get_weather(&self, location: String) -> String } }
+//  ```
+// There is no need to implement `Agent` anywhere, as it is automatically implemented by the `[agent_implementation]` attribute.
 pub trait Agent: Send + Sync {
-    fn raw_agent_id(&self) -> String;
+    fn raw_agent_impl_name(&self) -> String;
     fn invoke(&self, method_name: String, input: Vec<String>) -> StatusUpdate;
+
 }
