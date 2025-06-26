@@ -164,17 +164,6 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         _ => "unknown_impl".to_string(),
     };
 
-    let fn_name = format_ident!("register_agent_impl_{}", ty_name.to_lowercase());
-
-    let register_impl_fn = quote! {
-        #[::ctor::ctor]
-        fn #fn_name() {
-            golem_agentic::agent_registry::register_agent_impl(
-               ::std::sync::Arc::new(#self_ty)
-            );
-        }
-    };
-
     let base_impl = quote! {
         impl golem_agentic::agent::Agent for #self_ty {
             fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
@@ -204,15 +193,15 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
         impl ::golem_agentic::binding::exports::golem::agentic::guest::GuestAgent for #self_ty {
             fn new(agent_name: String, agent_id: String) -> Self {
-                #self_ty
+                #self_ty::new(agent_id, agent_name)
             }
 
             fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
-                golem_agentic::agent::Agent::invoke(&#self_ty, method_name, input)
+                golem_agentic::agent::Agent::invoke(self, method_name, input)
             }
 
             fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
-                golem_agentic::agent::Agent::get_definition(&#self_ty)
+                golem_agentic::agent::Agent::get_definition(self)
             }
         }
 
@@ -222,7 +211,6 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     let result = quote! {
         #input
         #base_impl
-        #register_impl_fn
         #final_component_quote
     };
 
