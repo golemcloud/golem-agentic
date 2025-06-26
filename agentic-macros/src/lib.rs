@@ -4,6 +4,7 @@ use quote::{format_ident, quote};
 
 #[allow(unused_imports)]
 use lazy_static::lazy_static;
+use syn::parse;
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -96,14 +97,15 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
 
 #[proc_macro_attribute]
 pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStream {
-    let input = syn::parse_macro_input!(item as syn::ItemImpl);
+    let item_cloned = item.clone();
+    let impl_block = syn::parse_macro_input!(item_cloned as syn::ItemImpl);
 
-    let trait_name = if let Some((_bang, path, _for_token)) = &input.trait_ {
+    let trait_name = if let Some((_bang, path, _for_token)) = &impl_block.trait_ {
         // Get the last segment of the path — the trait name
         &path.segments.last().unwrap().ident
     } else {
         return syn::Error::new_spanned(
-            &input.self_ty,
+            &impl_block.self_ty,
             "Expected an implementation of a trait, but found none.",
         )
         .to_compile_error()
@@ -112,11 +114,11 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
     let trait_name_str = trait_name.to_string();
 
-    let self_ty = &input.self_ty;
+    let self_ty = &impl_block.self_ty;
 
     let mut match_arms = Vec::new();
 
-    for item in &input.items {
+    for item in &impl_block.items {
         if let syn::ImplItem::Fn(method) = item {
             let method_name = method.sig.ident.to_string();
 
@@ -209,7 +211,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     };
 
     let result = quote! {
-        #input
+        #impl_block
         #base_impl
         #final_component_quote
     };
