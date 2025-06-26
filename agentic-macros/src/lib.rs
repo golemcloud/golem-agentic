@@ -1,12 +1,9 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
-use std::any::Any;
-use std::fmt::format;
 use quote::{format_ident, quote, ToTokens};
 
 #[allow(unused_imports)]
 use lazy_static::lazy_static;
-use proc_macro2::{Ident, Span};
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
