@@ -4,7 +4,7 @@ use quote::{format_ident, quote};
 
 #[allow(unused_imports)]
 use lazy_static::lazy_static;
-use syn::{parse, parse_macro_input, Data, DeriveInput, Fields};
+use syn::{parse, parse_macro_input, Data, DeriveInput, Fields, Lit, Meta};
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -267,16 +267,52 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
             continue;
         }
 
+        let mut custom_agent_id = None;
+        let mut custom_agent_name = None;
+
+
+        for attr in &field.attrs {
+
+                match &attr.meta  {
+                    Meta::NameValue(nv) if nv.path.is_ident("agent_id") => {
+                        if let syn::Expr::Lit(expr_lit) = &nv.value {
+                            if let syn::Lit::Str(litstr) = &expr_lit.lit {
+                                custom_agent_id = Some(litstr.value());
+                            }
+                        }
+                    }
+                    Meta::NameValue(nv) if nv.path.is_ident("agent_name") => {
+                        if let syn::Expr::Lit(expr_lit) = &nv.value {
+                            if let syn::Lit::Str(litstr) = &expr_lit.lit {
+                                custom_agent_name = Some(litstr.value());
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+        }
+
+        let agent_id_expr = custom_agent_id
+            .as_ref()
+            .map(|s| syn::parse_str::<syn::Expr>(&s).unwrap())
+            .unwrap_or_else(|| syn::parse_quote! { agent_id.clone() }); // TODO; it's always a remote agent.
+
+        let agent_name_expr = custom_agent_name
+            .as_ref()
+            .map(|s| syn::parse_str::<syn::Expr>(&s).unwrap())
+            .unwrap_or_else(|| syn::parse_quote! { agent_name.clone() });  // TODO; agent_name expr should be option so that it can piggyback on local calls
+
         extra_let_bindings.push(quote! {
             // I think this is wrong. the constructor is making use of same agent id and agent name.
             // I think probably one way to distinguish between local and remote agents is - whether or not
             // the given field has an agent-id and agent-name. Any local dependencies shouldn't need these fields
             // that will be the way to distinguish between local and remote agents
-          let #field_ident: #field_ty = #field_ty::new(agent_id.clone(), agent_name.clone());
+           let #field_ident: #field_ty = #field_ty::new(#agent_id_expr, #agent_name_expr);
         });
 
         extra_struct_fields.push(quote! { #field_ident });
     }
+
     let expanded = quote! {
         impl #impl_generics #struct_ident #ty_generics #where_clause {
             pub fn new(agent_id: String, agent_name: String) -> Self {
