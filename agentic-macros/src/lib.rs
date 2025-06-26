@@ -177,10 +177,6 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
     let base_impl = quote! {
         impl golem_agentic::agent::Agent for #self_ty {
-            fn raw_agent_impl_name(&self) -> String {
-                #self_ty.to_string()
-            }
-
             fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
                 match method_name.as_str() {
                     #(#match_arms,)*

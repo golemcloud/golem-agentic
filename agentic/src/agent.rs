@@ -23,7 +23,6 @@ use crate::binding::exports::golem::agentic::guest::{AgentDefinition, StatusUpda
 //  ```
 // There is no need to implement `Agent` anywhere, as it is automatically implemented by the `[agent_implementation]` attribute.
 pub trait Agent: Send + Sync {
-    fn raw_agent_impl_name(&self) -> String;
     fn invoke(&self, method_name: String, input: Vec<String>) -> StatusUpdate;
     fn get_definition(&self) -> AgentDefinition;
 }
