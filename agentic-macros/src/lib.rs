@@ -220,6 +220,9 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 }
 
 // Default constructor for agent structs
+// AgentConstructor currently constructs local agents and not remote agents
+// I need to keep thinking about remote agents based on the spec. All said, I still
+// believe we need a controlled way of generating this. Infact I believe the best way is
 #[proc_macro_derive(AgentConstructor)]
 pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -265,8 +268,12 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
         }
 
         extra_let_bindings.push(quote! {
-        let #field_ident: #field_ty = #field_ty::new(agent_id.clone(), agent_name.clone());
-    });
+            // I think this is wrong. the constructor is making use of same agent id and agent name.
+            // I think probably one way to distinguish between local and remote agents is - whether or not
+            // the given field has an agent-id and agent-name. Any local dependencies shouldn't need these fields
+            // that will be the way to distinguish between local and remote agents
+          let #field_ident: #field_ty = #field_ty::new(agent_id.clone(), agent_name.clone());
+        });
 
         extra_struct_fields.push(quote! { #field_ident });
     }
