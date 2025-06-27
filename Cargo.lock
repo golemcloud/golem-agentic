@@ -361,7 +361,7 @@ dependencies = [
 name = "golem-agentic"
 version = "0.0.0"
 dependencies = [
- "golem-rust",
+ "golem-wasm-rpc",
  "log",
  "mime",
  "nom",
@@ -379,32 +379,6 @@ dependencies = [
  "ctor",
  "golem-agentic",
  "lazy_static",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "golem-rust"
-version = "1.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46aaf34adda9057718d79e808fb323b3247cb34ec9c38ff88e74824d703980dd"
-dependencies = [
- "golem-rust-macro",
- "golem-wasm-rpc",
- "serde",
- "serde_json",
- "uuid",
- "wit-bindgen 0.40.0",
-]
-
-[[package]]
-name = "golem-rust-macro"
-version = "1.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ab4174ebe45b8a1961eedeebc215bbc475aea4bdf4f2baa80cc6222fb0058da"
-dependencies = [
- "heck 0.5.0",
  "proc-macro2",
  "quote",
  "syn",

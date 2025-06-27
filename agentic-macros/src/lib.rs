@@ -8,6 +8,8 @@ use syn::{parse_macro_input, Data, DeriveInput, Fields, Meta};
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
+
+
     let tr = syn::parse_macro_input!(item as syn::ItemTrait);
     let tr_name = tr.ident.clone();
     let tr_name_str = tr_name.to_string();
@@ -63,17 +65,17 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
             }
 
             Some(quote! {
-                golem_agentic::binding::exports::golem::agentic::guest::AgentMethod {
+                golem_agentic::bindings::exports::golem::agentic::guest::AgentMethod {
                     name: stringify!(#name).to_string(),
                     description: #description.to_string(),
                     prompt_hint: None,
-                    input_schema: ::golem_agentic::binding::exports::golem::agentic::guest::DataSchema::Structured(::golem_agentic::binding::exports::golem::agentic::guest::Structured {
-                          parameters:vec![::golem_agentic::binding::exports::golem::agentic::guest::ParameterType::Text(::golem_agentic::binding::exports::golem::agentic::guest::TextType {
+                    input_schema: ::golem_agentic::bindings::exports::golem::agentic::guest::DataSchema::Structured(::golem_agentic::bindings::exports::golem::agentic::guest::Structured {
+                          parameters:vec![::golem_agentic::bindings::exports::golem::agentic::guest::ParameterType::Text(::golem_agentic::bindings::exports::golem::agentic::guest::TextType {
                             language_code: "abc".to_string(),
                           })],
                     }),
-                    output_schema: ::golem_agentic::binding::exports::golem::agentic::guest::DataSchema::Structured(::golem_agentic::binding::exports::golem::agentic::guest::Structured {
-                      parameters:vec![::golem_agentic::binding::exports::golem::agentic::guest::ParameterType::Text(::golem_agentic::binding::exports::golem::agentic::guest::TextType {
+                    output_schema: ::golem_agentic::bindings::exports::golem::agentic::guest::DataSchema::Structured(::golem_agentic::bindings::exports::golem::agentic::guest::Structured {
+                      parameters:vec![::golem_agentic::bindings::exports::golem::agentic::guest::ParameterType::Text(::golem_agentic::bindings::exports::golem::agentic::guest::TextType {
                        language_code: "".to_string(), // TODO: Din't understand what exactly this is.
                       })],
                     }),
@@ -85,7 +87,7 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     });
 
     quote! {
-        golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
+        golem_agentic::bindings::exports::golem::agentic::guest::AgentDefinition {
             agent_name: #agent_name.to_string(),
             description: "".to_string(),
             methods: vec![#(#methods),*],
@@ -153,7 +155,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
                 #method_name => {
                     #(#extraction)*
                     let result: String = self.#ident(#(#param_idents),*);
-                    ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate::Emit(result.to_string())
+                    ::golem_agentic::bindings::exports::golem::agentic::guest::StatusUpdate::Emit(result.to_string())
                 }
             });
         }
@@ -161,14 +163,14 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
     let base_agent_impl = quote! {
         impl golem_agentic::agent::Agent for #self_ty {
-            fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
+            fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::bindings::exports::golem::agentic::guest::StatusUpdate {
                 match method_name.as_str() {
                     #(#match_arms,)*
                     _ => panic!("Unknown method: {}", method_name),
                 }
             }
 
-            fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
+            fn get_definition(&self) -> ::golem_agentic::bindings::exports::golem::agentic::guest::AgentDefinition {
                 golem_agentic::agent_registry::get_agent_def_by_name(&#trait_name_str)
                     .expect("Agent definition not found")
             }
@@ -322,15 +324,15 @@ pub fn generate_component(_input: TokenStream) -> TokenStream {
 
         struct Component;
 
-        impl ::golem_agentic::binding::exports::golem::agentic::guest::Guest for Component {
+        impl ::golem_agentic::bindings::exports::golem::agentic::guest::Guest for Component {
             type Agent = ResolvedAgent;
 
-            fn discover_agent_definitions() -> Vec<::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition> {
+            fn discover_agent_definitions() -> Vec<::golem_agentic::bindings::exports::golem::agentic::guest::AgentDefinition> {
                 ::golem_agentic::agent_registry::get_all_agent_definitions()
             }
         }
 
-        impl ::golem_agentic::binding::exports::golem::agentic::guest::GuestAgent for ResolvedAgent {
+        impl ::golem_agentic::bindings::exports::golem::agentic::guest::GuestAgent for ResolvedAgent {
             fn new(agent_name: String, agent_id: String) -> Self {
                 let agent_definitions = ::golem_agentic::agent_registry::get_all_agent_definitions();
                 let agent_definition = agent_definitions.iter().find(|x| x .agent_name == agent_name).unwrap();
@@ -344,16 +346,16 @@ pub fn generate_component(_input: TokenStream) -> TokenStream {
                 }
             }
 
-            fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
+            fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::bindings::exports::golem::agentic::guest::StatusUpdate {
                 self.agent.invoke(method_name, input)
             }
 
-            fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
+            fn get_definition(&self) -> ::golem_agentic::bindings::exports::golem::agentic::guest::AgentDefinition {
                 self.agent.get_definition()
             }
         }
 
-        ::golem_agentic::binding::export!(Component with_types_in ::golem_agentic::binding);
+        ::golem_agentic::bindings::export!(Component with_types_in ::golem_agentic::bindings);
     };
 
     generated.into()

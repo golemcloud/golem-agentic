@@ -1,4 +1,4 @@
-use crate::binding::exports::golem::agentic::guest::{AgentDefinition, StatusUpdate};
+use crate::bindings::exports::golem::agentic::guest::{AgentDefinition, StatusUpdate};
 use std::sync::Arc;
 
 // A simple Agent that every agent abstraction has to extend

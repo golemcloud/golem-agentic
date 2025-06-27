@@ -1,11 +1,7 @@
-use crate::binding::export;
-use crate::binding::exports::golem::agentic::guest::{
-    AgentDefinition, Guest, GuestAgent, StatusUpdate,
-};
-
 pub mod agent;
 pub mod agent_registry;
-pub mod binding;
+pub mod bindings;
+
 
 // Under the hood (Remove this code once done)
 //

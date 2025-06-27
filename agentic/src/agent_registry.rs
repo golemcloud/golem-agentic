@@ -1,5 +1,5 @@
 use crate::agent::Agent;
-use crate::binding::exports::golem::agentic::guest::AgentDefinition;
+use crate::bindings::exports::golem::agentic::guest::AgentDefinition;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

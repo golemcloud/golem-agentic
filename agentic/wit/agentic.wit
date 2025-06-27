@@ -87,5 +87,7 @@ interface guest {
 }
 
 world agentic {
-   export guest;
+    import golem:api/host@1.1.7;
+
+    export guest;
 }
