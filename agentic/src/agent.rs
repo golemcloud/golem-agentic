@@ -26,3 +26,8 @@ pub trait Agent: Send + Sync {
     fn invoke(&self, method_name: String, input: Vec<String>) -> StatusUpdate;
     fn get_definition(&self) -> AgentDefinition;
 }
+
+// This acts as the resource
+struct ResolvedAgent {
+    agent: Box<dyn Agent>,
+}

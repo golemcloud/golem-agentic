@@ -4,7 +4,7 @@ use quote::{format_ident, quote};
 
 #[allow(unused_imports)]
 use lazy_static::lazy_static;
-use syn::{parse, parse_macro_input, Data, DeriveInput, Fields, Lit, Meta};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, Meta};
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -161,11 +161,6 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     }
 
-    let ty_name = match &**self_ty {
-        syn::Type::Path(p) => p.path.segments.last().unwrap().ident.to_string(),
-        _ => "unknown_impl".to_string(),
-    };
-
     let base_impl = quote! {
         impl golem_agentic::agent::Agent for #self_ty {
             fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
@@ -182,38 +177,9 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     };
 
-    let final_component_quote = quote! {
-        struct Component;
-
-        impl ::golem_agentic::binding::exports::golem::agentic::guest::Guest for Component {
-            type Agent = #self_ty;
-
-            fn discover_agent_definitions() -> Vec<::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition> {
-                ::golem_agentic::agent_registry::get_all_agent_definitions()
-            }
-        }
-
-        impl ::golem_agentic::binding::exports::golem::agentic::guest::GuestAgent for #self_ty {
-            fn new(agent_name: String, agent_id: String) -> Self {
-                #self_ty::new(agent_id, agent_name)
-            }
-
-            fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
-                golem_agentic::agent::Agent::invoke(self, method_name, input)
-            }
-
-            fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
-                golem_agentic::agent::Agent::get_definition(self)
-            }
-        }
-
-      ::golem_agentic::binding::export!(Component with_types_in ::golem_agentic::binding);
-    };
-
     let result = quote! {
         #impl_block
         #base_impl
-        #final_component_quote
     };
 
     result.into()
@@ -262,7 +228,7 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
         let field_ty = &field.ty;
         let name_str = field_ident.to_string();
 
-        if name_str == "agent_id" || name_str == "agent_name" {
+        if name_str == "agent_id" {
             // Skip putting these in struct init list
             continue;
         }
@@ -328,3 +294,32 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
 
     TokenStream::from(expanded)
 }
+
+
+//   let final_component_quote = quote! {
+//         struct Component;
+//
+//         impl ::golem_agentic::binding::exports::golem::agentic::guest::Guest for Component {
+//             type Agent = #self_ty;
+//
+//             fn discover_agent_definitions() -> Vec<::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition> {
+//                 ::golem_agentic::agent_registry::get_all_agent_definitions()
+//             }
+//         }
+//
+//         impl ::golem_agentic::binding::exports::golem::agentic::guest::GuestAgent for #self_ty {
+//             fn new(agent_name: String, agent_id: String) -> Self {
+//                 #self_ty::new(agent_id, agent_name)
+//             }
+//
+//             fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
+//                 golem_agentic::agent::Agent::invoke(self, method_name, input)
+//             }
+//
+//             fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
+//                 golem_agentic::agent::Agent::get_definition(self)
+//             }
+//         }
+//
+//       ::golem_agentic::binding::export!(Component with_types_in ::golem_agentic::binding);
+//     };
