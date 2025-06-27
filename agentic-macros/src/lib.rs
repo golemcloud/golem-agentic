@@ -187,10 +187,23 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     };
 
+    let register_impl_fn = format_ident!("register_agent_impl_{}", trait_name_str.to_lowercase());
+
+    let register_impl_fn = quote! {
+        #[::ctor::ctor]
+        fn #register_impl_fn() {
+            golem_agentic::agent_registry::register_agent_impl(
+               #trait_name_str.to_string(),
+               ::std::sync::Arc::new(#resolver)
+            );
+        }
+    };
+
     let result = quote! {
         #impl_block
         #base_agent_impl
         #base_resolver_impl
+        #register_impl_fn
     };
 
     result.into()
@@ -213,8 +226,8 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
                     data_struct.struct_token,
                     "Only named fields are supported",
                 )
-                    .to_compile_error()
-                    .into();
+                .to_compile_error()
+                .into();
             }
         },
         _ => {
@@ -222,14 +235,13 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
                 input.ident.to_string(),
                 "AgentConstructor can only be derived for structs",
             )
-                .to_compile_error()
-                .into();
+            .to_compile_error()
+            .into();
         }
     };
 
     let mut extra_let_bindings = Vec::new();
     let mut extra_struct_fields = Vec::new();
-
 
     for field in fields.iter() {
         let field_ident = field.ident.as_ref().unwrap();
@@ -243,26 +255,24 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
         let mut custom_agent_id = None;
         let mut custom_agent_name = None;
 
-
         for attr in &field.attrs {
-
-                match &attr.meta  {
-                    Meta::NameValue(nv) if nv.path.is_ident("agent_id") => {
-                        if let syn::Expr::Lit(expr_lit) = &nv.value {
-                            if let syn::Lit::Str(litstr) = &expr_lit.lit {
-                                custom_agent_id = Some(litstr.value());
-                            }
+            match &attr.meta {
+                Meta::NameValue(nv) if nv.path.is_ident("agent_id") => {
+                    if let syn::Expr::Lit(expr_lit) = &nv.value {
+                        if let syn::Lit::Str(litstr) = &expr_lit.lit {
+                            custom_agent_id = Some(litstr.value());
                         }
                     }
-                    Meta::NameValue(nv) if nv.path.is_ident("agent_name") => {
-                        if let syn::Expr::Lit(expr_lit) = &nv.value {
-                            if let syn::Lit::Str(litstr) = &expr_lit.lit {
-                                custom_agent_name = Some(litstr.value());
-                            }
-                        }
-                    }
-                    _ => {}
                 }
+                Meta::NameValue(nv) if nv.path.is_ident("agent_name") => {
+                    if let syn::Expr::Lit(expr_lit) = &nv.value {
+                        if let syn::Lit::Str(litstr) = &expr_lit.lit {
+                            custom_agent_name = Some(litstr.value());
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
 
         let agent_id_expr = custom_agent_id
@@ -273,7 +283,7 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
         let agent_name_expr = custom_agent_name
             .as_ref()
             .map(|s| syn::parse_str::<syn::Expr>(&s).unwrap())
-            .unwrap_or_else(|| syn::parse_quote! { agent_name.clone() });  // TODO; agent_name expr should be option so that it can piggyback on local calls
+            .unwrap_or_else(|| syn::parse_quote! { agent_name.clone() }); // TODO; agent_name expr should be option so that it can piggyback on local calls
 
         extra_let_bindings.push(quote! {
             // I think this is wrong. the constructor is making use of same agent id and agent name.

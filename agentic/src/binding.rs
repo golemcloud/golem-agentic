@@ -1,5 +1,7 @@
 use crate::binding;
-use crate::binding::exports::golem::agentic::guest::{AgentDefinition, Guest, GuestAgent, StatusUpdate};
+use crate::binding::exports::golem::agentic::guest::{
+    AgentDefinition, Guest, GuestAgent, StatusUpdate,
+};
 
 wit_bindgen::generate!({
     path: "wit",
