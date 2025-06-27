@@ -102,7 +102,6 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     let impl_block = syn::parse_macro_input!(item_cloned as syn::ItemImpl);
 
     let trait_name = if let Some((_bang, path, _for_token)) = &impl_block.trait_ {
-        // Get the last segment of the path — the trait name
         &path.segments.last().unwrap().ident
     } else {
         return syn::Error::new_spanned(
