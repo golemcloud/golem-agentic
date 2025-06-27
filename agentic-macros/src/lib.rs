@@ -337,6 +337,7 @@ pub fn generate_component(_input: TokenStream) -> TokenStream {
                 let agent_impl_resolver = ::golem_agentic::agent_registry::get_agent_impl_by_def(agent_definition.agent_name.clone());
                 if let Some(resolver) = agent_impl_resolver {
                     let agent = resolver.resolve_agent_impl(agent_id, agent_name);
+                    // ResolvedAgent is a wrapper struct over real Agent impl to be able to implement as a resource
                     ResolvedAgent { agent }
                 } else {
                     panic!("No agent implementation found for agent definition: {}", agent_name);
