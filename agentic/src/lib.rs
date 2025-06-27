@@ -2,7 +2,6 @@ pub mod agent;
 pub mod agent_registry;
 pub mod bindings;
 
-
 // Under the hood (Remove this code once done)
 //
 // struct Component;

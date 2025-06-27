@@ -8,8 +8,6 @@ use syn::{parse_macro_input, Data, DeriveInput, Fields, Meta};
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
-
-
     let tr = syn::parse_macro_input!(item as syn::ItemTrait);
     let tr_name = tr.ident.clone();
     let tr_name_str = tr_name.to_string();
