@@ -43,9 +43,8 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
             let name = &trait_fn.sig.ident;
             let mut description = String::new();
 
-            // Look for a #[description = "..."] attribute
             for attr in &trait_fn.attrs {
-                if attr.path().is_ident("description") { // some plugins to ensure discription is set mandatorily will avoid bugs in AI agents
+                if attr.path().is_ident("description") {
                     let mut found = None;
                     attr.parse_nested_meta(|meta| {
                         if meta.path.is_ident("description") {
@@ -88,7 +87,7 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     quote! {
         golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
             agent_name: #agent_name.to_string(),
-            description: "".to_string(), // Optionally pull from attr
+            description: "".to_string(),
             methods: vec![#(#methods),*],
             requires: vec![]
         }
@@ -152,7 +151,6 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
             match_arms.push(quote! {
                 #method_name => {
-                    // extract them
                     #(#extraction)*
                     let result: String = self.#ident(#(#param_idents),*);
                     ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate::Emit(result.to_string())
@@ -161,7 +159,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     }
 
-    let base_impl = quote! {
+    let base_agent_impl = quote! {
         impl golem_agentic::agent::Agent for #self_ty {
             fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
                 match method_name.as_str() {
@@ -177,18 +175,28 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     };
 
+    let resolver = format_ident!("{}Resolver", trait_name);
+
+    let base_resolver_impl = quote! {
+        struct #resolver;
+
+        impl golem_agentic::agent_registry::Resolver for #resolver {
+            fn resolve_agent_impl(&self, agent_id: String, agent_name: String) -> ::std::sync::Arc<dyn golem_agentic::agent::Agent + Send + Sync> {
+                 ::std::sync::Arc::new(#self_ty {agent_id})
+            }
+        }
+    };
+
     let result = quote! {
         #impl_block
-        #base_impl
+        #base_agent_impl
+        #base_resolver_impl
     };
 
     result.into()
 }
 
-// Default constructor for agent structs
-// AgentConstructor currently constructs local agents and not remote agents
-// I need to keep thinking about remote agents based on the spec. All said, I still
-// believe we need a controlled way of generating this. Infact I believe the best way is
+// Well, let's try to avoid this!!!
 #[proc_macro_derive(AgentConstructor)]
 pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -229,7 +237,6 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
         let name_str = field_ident.to_string();
 
         if name_str == "agent_id" {
-            // Skip putting these in struct init list
             continue;
         }
 
@@ -295,31 +302,48 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+#[proc_macro]
+pub fn generate_component(_input: TokenStream) -> TokenStream {
+    let generated = quote! {
+        // This acts as the resource
+        pub struct ResolvedAgent {
+           pub agent: ::std::sync::Arc<dyn ::golem_agentic::agent::Agent + Send + Sync>,
+        }
 
-//   let final_component_quote = quote! {
-//         struct Component;
-//
-//         impl ::golem_agentic::binding::exports::golem::agentic::guest::Guest for Component {
-//             type Agent = #self_ty;
-//
-//             fn discover_agent_definitions() -> Vec<::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition> {
-//                 ::golem_agentic::agent_registry::get_all_agent_definitions()
-//             }
-//         }
-//
-//         impl ::golem_agentic::binding::exports::golem::agentic::guest::GuestAgent for #self_ty {
-//             fn new(agent_name: String, agent_id: String) -> Self {
-//                 #self_ty::new(agent_id, agent_name)
-//             }
-//
-//             fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
-//                 golem_agentic::agent::Agent::invoke(self, method_name, input)
-//             }
-//
-//             fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
-//                 golem_agentic::agent::Agent::get_definition(self)
-//             }
-//         }
-//
-//       ::golem_agentic::binding::export!(Component with_types_in ::golem_agentic::binding);
-//     };
+        struct Component;
+
+        impl ::golem_agentic::binding::exports::golem::agentic::guest::Guest for Component {
+            type Agent = ResolvedAgent;
+
+            fn discover_agent_definitions() -> Vec<::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition> {
+                ::golem_agentic::agent_registry::get_all_agent_definitions()
+            }
+        }
+
+        impl ::golem_agentic::binding::exports::golem::agentic::guest::GuestAgent for ResolvedAgent {
+            fn new(agent_name: String, agent_id: String) -> Self {
+                let agent_definitions = ::golem_agentic::agent_registry::get_all_agent_definitions();
+                let agent_definition = agent_definitions.iter().find(|x| x .agent_name == agent_name).unwrap();
+                let agent_impl_resolver = ::golem_agentic::agent_registry::get_agent_impl_by_def(agent_definition.agent_name.clone());
+                if let Some(resolver) = agent_impl_resolver {
+                    let agent = resolver.resolve_agent_impl(agent_id, agent_name);
+                    ResolvedAgent { agent }
+                } else {
+                    panic!("No agent implementation found for agent definition: {}", agent_name);
+                }
+            }
+
+            fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::binding::exports::golem::agentic::guest::StatusUpdate {
+                self.agent.invoke(method_name, input)
+            }
+
+            fn get_definition(&self) -> ::golem_agentic::binding::exports::golem::agentic::guest::AgentDefinition {
+                self.agent.get_definition()
+            }
+        }
+
+        ::golem_agentic::binding::export!(Component with_types_in ::golem_agentic::binding);
+    };
+
+    generated.into()
+}
