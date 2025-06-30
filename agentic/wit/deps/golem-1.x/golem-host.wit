@@ -276,10 +276,10 @@ interface host {
 interface agentic-host {
     use golem:agentic/common.{agent-definition, agent-dependency, status-update};
 
-    resource remote-agentss {
+    resource remote-agent {
         constructor(agent: agent-dependency, agent-id: string);
 
-        invoke: func(method-name: string, input: list<string>) -> stream<status-update>;
+        invoke: func(method-name: string, input: list<string>) -> status-update;
     }
 
     discover-agent-definitions: func() -> list<agent-definition>;
@@ -302,6 +302,7 @@ interface load-snapshot {
 
 world golem-host {
     import host;
+    import agentic-host;
     import save-snapshot;
     import load-snapshot;
 }
