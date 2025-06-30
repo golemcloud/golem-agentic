@@ -6,8 +6,6 @@ use std::sync::{Arc, Mutex};
 
 type AgentTraitName = String;
 
-type AgentTraitImplName = String;
-
 static AGENT_DEF_REGISTRY: Lazy<Mutex<HashMap<AgentTraitName, AgentDefinition>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
