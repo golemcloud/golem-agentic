@@ -63,17 +63,17 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
             }
 
             Some(quote! {
-                golem_agentic::bindings::exports::golem::agentic::guest::AgentMethod {
+                golem_agentic::bindings::golem::agentic::common::AgentMethod {
                     name: stringify!(#name).to_string(),
                     description: #description.to_string(),
                     prompt_hint: None,
-                    input_schema: ::golem_agentic::bindings::exports::golem::agentic::guest::DataSchema::Structured(::golem_agentic::bindings::exports::golem::agentic::guest::Structured {
-                          parameters:vec![::golem_agentic::bindings::exports::golem::agentic::guest::ParameterType::Text(::golem_agentic::bindings::exports::golem::agentic::guest::TextType {
+                    input_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
+                          parameters:vec![::golem_agentic::bindings::golem::agentic::common::ParameterType::Text(::golem_agentic::bindings::golem::agentic::common::TextType {
                             language_code: "abc".to_string(),
                           })],
                     }),
-                    output_schema: ::golem_agentic::bindings::exports::golem::agentic::guest::DataSchema::Structured(::golem_agentic::bindings::exports::golem::agentic::guest::Structured {
-                      parameters:vec![::golem_agentic::bindings::exports::golem::agentic::guest::ParameterType::Text(::golem_agentic::bindings::exports::golem::agentic::guest::TextType {
+                    output_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
+                      parameters:vec![::golem_agentic::bindings::golem::agentic::common::ParameterType::Text(::golem_agentic::bindings::golem::agentic::common::TextType {
                        language_code: "".to_string(), // TODO: Din't understand what exactly this is.
                       })],
                     }),
@@ -85,7 +85,7 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     });
 
     quote! {
-        golem_agentic::bindings::exports::golem::agentic::guest::AgentDefinition {
+        golem_agentic::bindings::golem::agentic::common::AgentDefinition {
             agent_name: #agent_name.to_string(),
             description: "".to_string(),
             methods: vec![#(#methods),*],
@@ -152,7 +152,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
                 #method_name => {
                     #(#extraction)*
                     let result: String = self.#ident(#(#param_idents),*);
-                    ::golem_agentic::bindings::exports::golem::agentic::guest::StatusUpdate::Emit(result.to_string())
+                    ::golem_agentic::bindings::exports::golem::agentic_guest::guest::StatusUpdate::Emit(result.to_string())
                 }
             });
         }
@@ -160,14 +160,14 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
     let base_agent_impl = quote! {
         impl golem_agentic::agent::Agent for #self_ty {
-            fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::bindings::exports::golem::agentic::guest::StatusUpdate {
+            fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::bindings::golem::agentic::common::StatusUpdate {
                 match method_name.as_str() {
                     #(#match_arms,)*
                     _ => panic!("Unknown method: {}", method_name),
                 }
             }
 
-            fn get_definition(&self) -> ::golem_agentic::bindings::exports::golem::agentic::guest::AgentDefinition {
+            fn get_definition(&self) -> ::golem_agentic::bindings::golem::agentic::common::AgentDefinition {
                 golem_agentic::agent_registry::get_agent_def_by_name(&#trait_name_str)
                     .expect("Agent definition not found")
             }

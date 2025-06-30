@@ -9,15 +9,15 @@ macro_rules! generate_component {
 
         struct Component;
 
-        impl crate::bindings::exports::golem::agentic::guest::Guest for Component {
+        impl crate::bindings::exports::golem::agentic_guest::guest::Guest for Component {
             type Agent = ResolvedAgent;
 
-            fn discover_agent_definitions() -> Vec<crate::bindings::exports::golem::agentic::guest::AgentDefinition> {
+            fn discover_agent_definitions() -> Vec<crate::bindings::exports::golem::agentic_guest::guest::AgentDefinition> {
                 crate::agent_registry::get_all_agent_definitions()
             }
         }
 
-        impl crate::bindings::exports::golem::agentic::guest::GuestAgent for ResolvedAgent {
+        impl crate::bindings::exports::golem::agentic_guest::guest::GuestAgent for ResolvedAgent {
             fn new(agent_name: String, agent_id: String) -> Self {
                 let agent_definitions = crate::agent_registry::get_all_agent_definitions();
                 let agent_definition = agent_definitions.iter().find(|x| x.agent_name == agent_name).unwrap();
@@ -30,11 +30,11 @@ macro_rules! generate_component {
                 }
             }
 
-            fn invoke(&self, method_name: String, input: Vec<String>) -> crate::bindings::exports::golem::agentic::guest::StatusUpdate {
+            fn invoke(&self, method_name: String, input: Vec<String>) -> crate::bindings::exports::golem::agentic_guest::guest::StatusUpdate {
                 self.agent.invoke(method_name, input)
             }
 
-            fn get_definition(&self) -> crate::bindings::exports::golem::agentic::guest::AgentDefinition {
+            fn get_definition(&self) -> crate::bindings::exports::golem::agentic_guest::guest::AgentDefinition {
                 self.agent.get_definition()
             }
         }

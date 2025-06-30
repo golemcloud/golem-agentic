@@ -1,4 +1,4 @@
-use crate::bindings::exports::golem::agentic::guest::{AgentDefinition, StatusUpdate};
+use crate::bindings::exports::golem::agentic_guest::guest::{AgentDefinition, StatusUpdate};
 
 // A simple Agent that every agent abstraction has to extend
 // This is auto implemented when using `agent_implementation` attribute.
