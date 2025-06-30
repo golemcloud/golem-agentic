@@ -1,5 +1,5 @@
-// Can be embedded anywhere!
-// Can be simple non macros code.
+// TODO;May be it doesn't need to be macros, as we never need to embed this anywhere else than SDK
+
 #[macro_export]
 macro_rules! generate_component {
     () => {
