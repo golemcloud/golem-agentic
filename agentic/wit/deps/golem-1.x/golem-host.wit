@@ -148,6 +148,12 @@ interface host {
         get-next: func() -> option<list<worker-metadata>>;
     }
 
+    resource remote-agent {
+        constructor(agent: agent-dependency, agent-id: string);
+
+        invoke: func(method-name: string, input: list<string>) -> status-update;
+    }
+
     /// Target parameter for the `revert-worker` operation
     variant revert-worker-target {
         /// Revert to a specific oplog index. The given index will be the last one to be kept.
@@ -271,18 +277,9 @@ interface host {
     /// and this worker continues running as well. The return value is going to be different in this worker and
     /// the forked worker.
     fork: func(new-name: string) -> fork-result;
-}
-
-interface agentic-host {
-    use golem:agentic/common.{agent-definition, agent-dependency, status-update};
-
-    resource remote-agent {
-        constructor(agent: agent-dependency, agent-id: string);
-
-        invoke: func(method-name: string, input: list<string>) -> status-update;
-    }
 
     discover-agent-definitions: func() -> list<agent-definition>;
+
 }
 
 /// Interface providing user-defined snapshotting capability. This can be used to perform manual update of workers
@@ -302,7 +299,6 @@ interface load-snapshot {
 
 world golem-host {
     import host;
-    import agentic-host;
     import save-snapshot;
     import load-snapshot;
 }

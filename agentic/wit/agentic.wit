@@ -18,6 +18,6 @@ interface guest {
 }
 
 world agentic {
-    import golem:api/agentic-host@1.1.7;
+    import golem:api/host@1.1.7;
     export guest;
 }
