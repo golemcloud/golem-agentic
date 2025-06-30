@@ -164,9 +164,6 @@ interface host {
         forked
     }
 
-    resource remote-agent {
-        constructor(agent: agent-dependency, agent-id: string);
-    }
 
     /// Create a new promise
     create-promise: func() -> promise-id;
@@ -274,10 +271,18 @@ interface host {
     /// and this worker continues running as well. The return value is going to be different in this worker and
     /// the forked worker.
     fork: func(new-name: string) -> fork-result;
+}
 
-    // /// Discover all agent definitions
-    // discover-agent-definitions: func() -> list<agent-definition>;
+interface agentic-host {
+    use golem:agentic/common.{agent-definition, agent-dependency, status-update};
 
+    resource remote-agentss {
+        constructor(agent: agent-dependency, agent-id: string);
+
+        invoke-something: func() -> stream<status-update>;
+    }
+
+    discover-agent-definitions: func() -> list<agent-definition>;
 }
 
 /// Interface providing user-defined snapshotting capability. This can be used to perform manual update of workers
