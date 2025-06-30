@@ -279,7 +279,7 @@ interface agentic-host {
     resource remote-agentss {
         constructor(agent: agent-dependency, agent-id: string);
 
-        invoke-something: func() -> stream<status-update>;
+        invoke: func(method-name: string, input: list<string>) -> stream<status-update>;
     }
 
     discover-agent-definitions: func() -> list<agent-definition>;
