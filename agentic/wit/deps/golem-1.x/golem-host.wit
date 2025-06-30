@@ -5,7 +5,7 @@ package golem:api@1.1.7;
 interface host {
     use wasi:clocks/monotonic-clock@0.2.3.{duration};
     use golem:rpc/types@0.2.1.{component-id, uuid, worker-id};
-    use golem:agentic/common.{agent-definition, agent-dependency, agent-method, status-update};
+    use golem:agentic/common.{agent-definition, agent-dependency, status-update};
 
     /// An index into the persistent log storing all performed operations of a worker
     type oplog-index = u64;
@@ -166,8 +166,6 @@ interface host {
 
     resource remote-agent {
         constructor(agent: agent-dependency, agent-id: string);
-
-        invoke: func(method-name: string, input: list<string>) -> stream<status-update>;
     }
 
     /// Create a new promise
@@ -277,8 +275,8 @@ interface host {
     /// the forked worker.
     fork: func(new-name: string) -> fork-result;
 
-    /// Discover all agent definitions
-    discover-agent-definitions: func() -> list<agent-definition>;
+    // /// Discover all agent definitions
+    // discover-agent-definitions: func() -> list<agent-definition>;
 
 }
 
