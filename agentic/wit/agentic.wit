@@ -17,7 +17,7 @@ interface guest {
     discover-agent-definitions: func() -> list<agent-definition>;
 }
 
-world agentic {
+world agentic-guest {
     import golem:api/host@1.1.7;
     export guest;
 }
