@@ -14,21 +14,86 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let fn_suffix = &tr_name.to_string().to_lowercase();
     let fn_name = format_ident!("register_agent_definition_{}", fn_suffix); // may be ctor is not required. But works now
 
-    let meta = get_agent_definition(&tr);
+    let agent_definition = get_agent_definition(&tr);
 
     let register_fn = quote! {
         #[::ctor::ctor]
         fn #fn_name() {
             golem_agentic::agent_registry::register_agent_definition(
                #tr_name_str.to_string(),
-                #meta
+                #agent_definition
             );
+        }
+    };
+
+    let remote_trait_name = format_ident!("Remote{}", tr_name);
+
+    let method_impls = tr.items.iter().filter_map(|item| {
+        if let syn::TraitItem::Fn(method) = item {
+            let method_name = &method.sig.ident;
+            let method_name_str = method_name.to_string();
+
+            let inputs: Vec<_> = method.sig.inputs.iter().collect();
+
+            let input_idents: Vec<_> = method
+                .sig
+                .inputs
+                .iter()
+                .filter_map(|arg| {
+                    if let syn::FnArg::Typed(pat_type) = arg {
+                        if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
+                            Some(pat_ident.ident.clone())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            let input_vec = quote! {
+                vec![#(#input_idents.to_string()),*]
+            };
+
+            let return_type = match &method.sig.output {
+                syn::ReturnType::Type(_, ty) => quote! { #ty },
+                syn::ReturnType::Default => quote! { () },
+            };
+
+            Some(quote! {
+                async fn #method_name(#(#inputs),*) -> #return_type {
+                    let result = self.inner.invoke(#method_name_str, #input_vec.as_slice());
+                    match result {
+                        ::golem_agentic::bindings::golem::agentic::common::StatusUpdate::Emit(val) => val,
+                        _ => panic!("Unexpected response"),
+                    }
+                }
+            })
+        } else {
+            None
+        }
+    });
+
+    let remote_client = quote! {
+        pub struct #remote_trait_name {
+            inner: ::golem_agentic::bindings::golem::api::host::RemoteAgent,
+        }
+
+        impl #remote_trait_name {
+            pub fn new(agent_id: String) -> Self {
+                let inner =  ::golem_agentic::bindings::golem::api::host::RemoteAgent::new(&::golem_agentic::bindings::golem::agentic::common::AgentDependency { agent_name: #agent_definition.agent_name, methods: #agent_definition.methods}, #tr_name_str);
+                Self { inner }
+            }
+
+            #(#method_impls)*
         }
     };
 
     let result = quote! {
         #tr
         #register_fn
+        #remote_client
     };
 
     result.into()
