@@ -19,12 +19,6 @@ cargo build
 Refer to [golem-agentic-examples](https://github.com/golemcloud/golem-agentic-examples) repo.
 These examples will become templates in golem-cli soon.
 
-## Test
-
-Currently testing is done using low level APIs through Rib. This will get better soon
-
-![img.png](img.png)
-
 
 ## TODO (to be made as tickets)
 
