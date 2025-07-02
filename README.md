@@ -27,9 +27,9 @@ Currently testing is done using low level APIs through Rib. This will get better
 
 
 ## TODO (to be made as tickets)
-* **Step 1:** Currently tested with just string arguments,. Make sure paramerter types and return types talks proper WitType , and implement proper mapping between WitType and argument types.
-* **Step 2:** Make sure external interactions look like typesafe rpc calls when interactiing with agents - meaning golem repl shouldn't talk low level WITs. This should be possible if typesafe rpc is possible. Multiple   suggestions exist such as custom_section, adapter etc. There were a few time consuming parts but confident external interactions such as from REPL can be typesafe, if RPC is already proven to be typesafe.
-* **Step 3: **Make sure code_first_agent branch in golem OSS is merged into OSS. golem-wit changes and implementation already exist here. Do it properly though
-* **Step 4:** Make sure agents can exist in different modules within a workspace and can exist as different workers.
-* **Step 5: **Integrate with Golem CLI and template these examples
-* **Step 6: **Incrementally add AI specific types into the root WIT. We can break this into multiple tickets.
+* Currently tested with just string arguments,. Make sure paramerter types and return types talks proper WitType , and implement proper mapping between WitType and argument types.
+* Make sure external interactions look like typesafe rpc calls when interactiing with agents - meaning golem repl shouldn't talk low level WITs. This should be possible if typesafe rpc is possible. Multiple   suggestions exist such as custom_section, adapter etc. There were a few time consuming parts but confident external interactions such as from REPL can be typesafe, if RPC is already proven to be typesafe.
+* Make sure [code_first_agent](https://github.com/golemcloud/golem/compare/main...code_first_agent) branch in golem OSS is merged into OSS. golem-wit changes and implementation already exist here. Some integration tests already exist in this branch.
+* Make sure agents can exist in different modules within a workspace and can exist as different workers.
+* Integrate with Golem CLI and template these examples
+* Incrementally add AI specific types into the root WIT. We can break this into multiple tickets.
