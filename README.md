@@ -27,6 +27,9 @@ Currently testing is done using low level APIs through Rib. This will get better
 
 
 ## TODO (to be made as tickets)
+
+Mostly the prototype implementation already did the complex or confusing parts, and what's remaining are details.
+
 * Currently tested with just string arguments,. Make sure paramerter types and return types talks proper WitType , and implement proper mapping between WitType and argument types.
 * Make sure external interactions look like typesafe rpc calls when interactiing with agents - meaning golem repl shouldn't talk low level WITs. This should be possible if typesafe rpc is possible. Multiple   suggestions exist such as custom_section, adapter etc. There were a few time consuming parts but confident external interactions such as from REPL can be typesafe, if RPC is already proven to be typesafe.
 * Make sure [code_first_agent](https://github.com/golemcloud/golem/compare/main...code_first_agent) branch in golem OSS is merged into OSS. golem-wit changes and implementation already exist here. Some integration tests already exist in this branch.
