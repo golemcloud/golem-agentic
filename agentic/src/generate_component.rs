@@ -1,5 +1,7 @@
 // TODO;May be it doesn't need to be macros, as we never need to embed this anywhere else than SDK
 
+use crate::bindings::golem::agentic::common::{Error, StatusUpdate};
+
 #[macro_export]
 macro_rules! generate_component {
     () => {
@@ -18,6 +20,7 @@ macro_rules! generate_component {
         }
 
         impl crate::bindings::exports::golem::agentic_guest::guest::GuestAgent for ResolvedAgent {
+
             fn new(agent_name: String, agent_id: String) -> Self {
                 let agent_definitions = crate::agent_registry::get_all_agent_definitions();
                 let agent_definition = agent_definitions.iter().find(|x| x.agent_name == agent_name).unwrap();
@@ -31,6 +34,7 @@ macro_rules! generate_component {
             }
 
             fn invoke(&self, method_name: String, input: Vec<String>) -> crate::bindings::exports::golem::agentic_guest::guest::StatusUpdate {
+                println!("Invoking method: {} with input: {:?}", method_name, input);
                 self.agent.invoke(method_name, input)
             }
 

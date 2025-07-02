@@ -229,7 +229,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
             fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::bindings::golem::agentic::common::StatusUpdate {
                 match method_name.as_str() {
                     #(#match_arms,)*
-                    _ => panic!("Unknown method: {}", method_name),
+                    _ =>  ::golem_agentic::bindings::golem::agentic::common::StatusUpdate::Error(::golem_agentic::bindings::golem::agentic::common::Error::NetworkError)
                 }
             }
 
