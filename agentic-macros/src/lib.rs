@@ -82,8 +82,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
 
         impl #remote_trait_name {
             pub fn new(agent_id: String) -> Self {
-                let inner =  ::golem_agentic::bindings::golem::api::host::RemoteAgent::new(&::golem_agentic::bindings::golem::agentic::common::AgentDependency { agent_name: #agent_definition.agent_name, methods: #agent_definition.methods}, #tr_name_str);
-                dbg!(&inner);
+                let inner =  ::golem_agentic::bindings::golem::api::host::RemoteAgent::new(&::golem_agentic::bindings::golem::agentic::common::AgentDependency { agent_name: #agent_definition.agent_name, methods: #agent_definition.methods}, agent_id.as_str());
                 Self { inner }
             }
 
@@ -100,7 +99,6 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     result.into()
 }
 
-// Extract AgentDefinition from an abstract agent definition
 fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     let agent_name = tr.ident.to_string();
 
