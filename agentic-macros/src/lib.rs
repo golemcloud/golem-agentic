@@ -1,15 +1,14 @@
-mod type_mapping;
 
 extern crate proc_macro;
 use proc_macro::TokenStream;
-use golem_wasm_ast::analysis::analysed_type::{bool, f64, s64, str, u64};
-use golem_wasm_rpc::WitType;
+use golem_wasm_ast::analysis::analysed_type::*;
+use golem_wasm_rpc::{ResourceMode, WitTypeNode};
 use quote::{format_ident, quote};
 
 #[allow(unused_imports)]
 use lazy_static::lazy_static;
 use syn::{parse_macro_input, Data, DeriveInput, Fields, Meta};
-use crate::type_mapping::get_wit_type;
+use golem_agentic::bindings::golem::agentic::common::WitType;
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -172,6 +171,21 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
                 };
             }
 
+            let input_parameters: Vec<_> = parameter_types.into_iter().map(|ty| {
+                let tokens = wit_type_to_tokens(&ty);
+                quote! {
+                    ::golem_agentic::bindings::golem::agentic::common::ParameterType::Wit(#tokens)
+                }
+            }).collect();
+
+            let output_parameters: Vec<_> = result_type.into_iter().map(|ty| {
+                let tokens = wit_type_to_tokens(&ty);
+
+                quote! {
+                    ::golem_agentic::bindings::golem::agentic::common::ParameterType::Wit(#tokens)
+                }
+            }).collect();
+
 
             Some(quote! {
                 golem_agentic::bindings::golem::agentic::common::AgentMethod {
@@ -179,10 +193,10 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
                     description: #description.to_string(),
                     prompt_hint: None,
                     input_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
-                          parameters:  parameter_types.iter().map(|ty| {::golem_agentic::bindings::golem::agentic::common::ParameterType::Wit(ty.clone())}).collect::<Vec<_>>()
+                          parameters: vec![#(#input_parameters),*]
                     }),
                     output_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
-                      parameters: result_type.iter().map(|ty| {::golem_agentic::bindings::golem::agentic::common::ParameterType::Wit(ty.clone())}).collect::<Vec<_>>()
+                      parameters: vec![#(#output_parameters),*]
                     }),
                 }
             })
@@ -416,4 +430,123 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
+}
+
+fn get_wit_type(ty: &syn::Type) -> Option<WitType> {
+    let analysed_type = if let syn::Type::Path(type_path) = ty {
+        let ident = type_path.path.segments.last().unwrap().ident.to_string();
+
+        match ident.as_str() {
+            "String" => Some(str()),
+            "bool" => Some(bool()),
+            "u64" => Some(u64()),
+            "i64" => Some(s64()),
+            "f64" => Some(f64()),
+            _ => None, // TODO; complete the rest
+        }
+    } else {
+        None
+    }?;
+
+
+    Some(WitType::from(analysed_type))
+}
+
+fn wit_type_node_to_tokens(node: &WitTypeNode) -> proc_macro2::TokenStream {
+    match node {
+        WitTypeNode::RecordType(fields) => {
+            let fields_tokens = fields.iter().map(|(name, idx)| {
+                let name = name;
+                let idx = *idx;
+                quote! { (#name.to_string(), #idx) }
+            });
+            quote! {
+                ::golem_wasm_rpc::WitTypeNode::RecordType(vec![#(#fields_tokens),*])
+            }
+        }
+        WitTypeNode::VariantType(variants) => {
+            let variants_tokens = variants.iter().map(|(name, opt_idx)| {
+                let name = name;
+                match opt_idx {
+                    Some(idx) => quote! { (#name.to_string(), Some(#idx)) },
+                    None => quote! { (#name.to_string(), None) },
+                }
+            });
+            quote! {
+                ::golem_wasm_rpc::WitTypeNode::VariantType(vec![#(#variants_tokens),*])
+            }
+        }
+        WitTypeNode::EnumType(variants) => {
+            let variants_tokens = variants.iter().map(|v| quote! { #v.to_string() });
+            quote! {
+                ::golem_wasm_rpc::WitTypeNode::EnumType(vec![#(#variants_tokens),*])
+            }
+        }
+        WitTypeNode::FlagsType(flags) => {
+            let flags_tokens = flags.iter().map(|f| quote! { #f.to_string() });
+            quote! {
+                ::golem_wasm_rpc::WitTypeNode::FlagsType(vec![#(#flags_tokens),*])
+            }
+        }
+        WitTypeNode::TupleType(indices) => {
+            let indices_tokens = indices.iter().copied();
+            quote! {
+                ::golem_wasm_rpc::WitTypeNode::TupleType(vec![#(#indices_tokens),*])
+            }
+        }
+        WitTypeNode::ListType(idx) => {
+            quote! {
+                ::golem_wasm_rpc::WitTypeNode::ListType(#idx)
+            }
+        }
+        WitTypeNode::OptionType(idx) => {
+            quote! {
+                ::golem_wasm_rpc::WitTypeNode::OptionType(#idx)
+            }
+        }
+        WitTypeNode::ResultType((ok, err)) => {
+            let ok_tokens = match ok {
+                Some(idx) => quote! { Some(#idx) },
+                None => quote! { None },
+            };
+            let err_tokens = match err {
+                Some(idx) => quote! { Some(#idx) },
+                None => quote! { None },
+            };
+            quote! {
+                ::golem_wasm_rpc::WitTypeNode::ResultType((#ok_tokens, #err_tokens))
+            }
+        }
+        WitTypeNode::PrimU8Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimU8Type },
+        WitTypeNode::PrimU16Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimU16Type },
+        WitTypeNode::PrimU32Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimU32Type },
+        WitTypeNode::PrimU64Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimU64Type },
+        WitTypeNode::PrimS8Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimS8Type },
+        WitTypeNode::PrimS16Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimS16Type },
+        WitTypeNode::PrimS32Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimS32Type },
+        WitTypeNode::PrimS64Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimS64Type },
+        WitTypeNode::PrimF32Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimF32Type },
+        WitTypeNode::PrimF64Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimF64Type },
+        WitTypeNode::PrimCharType => quote! { ::golem_wasm_rpc::WitTypeNode::PrimCharType },
+        WitTypeNode::PrimBoolType => quote! { ::golem_wasm_rpc::WitTypeNode::PrimBoolType },
+        WitTypeNode::PrimStringType => quote! { ::golem_wasm_rpc::WitTypeNode::PrimStringType },
+        WitTypeNode::HandleType((res_id, res_mode)) => {
+            let res_mode_tokens = match res_mode {
+                ResourceMode::Owned => quote! { ::golem_wasm_rpc::ResourceMode::Owned },
+                ResourceMode::Borrowed => quote! { ::golem_wasm_rpc::ResourceMode::Borrowed },
+            };
+            quote! {
+                ::golem_wasm_rpc::WitTypeNode::HandleType((#res_id, #res_mode_tokens))
+            }
+        }
+    }
+}
+
+fn wit_type_to_tokens(ty: &WitType) -> proc_macro2::TokenStream {
+    let nodes_tokens = ty.nodes.iter().map(wit_type_node_to_tokens);
+    quote! {
+        ::golem_wasm_rpc::WitType {
+            nodes: vec![#(#nodes_tokens),*]
+        }
+    }
 }

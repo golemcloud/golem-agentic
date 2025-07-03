@@ -11,8 +11,8 @@ path = "src/lib.rs"
 crate-type = ["rlib"]
 
 [dependencies]
-golem-wasm-rpc = { version = "1.3.0-dev.2", default-features = false, features = [
-    "stub", "bincode", "text"
+golem-wasm-rpc = { path =  "../../golem/wasm-rpc",  default-features = false, features = [
+    "stub",
 ] }
 log = { workspace = true }
 mime = "0.3.17"
