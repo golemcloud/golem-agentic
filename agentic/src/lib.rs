@@ -7,7 +7,7 @@ pub mod bindings;
 pub mod generate_component;
 
 pub struct ResolvedAgent {
-    pub agent: ::std::sync::Arc<dyn crate::agent::Agent + Send + Sync>,
+    pub agent: ::std::sync::Arc<dyn agent::Agent + Send + Sync>,
 }
 
 struct Component;
