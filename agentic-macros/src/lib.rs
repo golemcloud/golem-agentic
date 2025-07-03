@@ -1,10 +1,15 @@
+mod type_mapping;
+
 extern crate proc_macro;
 use proc_macro::TokenStream;
+use golem_wasm_ast::analysis::analysed_type::{bool, f64, s64, str, u64};
+use golem_wasm_rpc::WitType;
 use quote::{format_ident, quote};
 
 #[allow(unused_imports)]
 use lazy_static::lazy_static;
 use syn::{parse_macro_input, Data, DeriveInput, Fields, Meta};
+use crate::type_mapping::get_wit_type;
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -126,20 +131,58 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
                 }
             }
 
+
+            let mut parameter_types = vec![]; // This is WIT type for now, but needs to support structured text type
+            let mut result_type = vec![];
+
+            if let syn::TraitItem::Fn(trait_fn) = item {
+                for input in &trait_fn.sig.inputs {
+                    if let syn::FnArg::Typed(pat_type) = input {
+                        let ty: &syn::Type = &pat_type.ty;
+                        let wit_type = get_wit_type(ty);
+
+                        match wit_type {
+                            Some(x) => {
+                                parameter_types.push(x);
+                            }
+                            None =>  return syn::Error::new_spanned(
+                                ty,
+                                format!("Unsupported type in agent method: {}", quote::quote!(#ty)), // this should never happen once we extend type-mapping
+                            ).to_compile_error().into()
+
+                        }
+                    }
+                }
+
+                // Handle return type
+                match &trait_fn.sig.output {
+                    syn::ReturnType::Default => (),
+                    syn::ReturnType::Type(_, ty) => {
+                        let wit_type = get_wit_type(ty);
+                        match wit_type {
+                            Some(x) => {
+                                result_type.push(x);
+                            }
+                            None => return syn::Error::new_spanned(
+                                ty,
+                                format!("Unsupported return type in agent method: {}", quote::quote!(#ty)), // this should never happen once we extend type-mapping
+                            ).to_compile_error().into()
+                        }
+                    }
+                };
+            }
+
+
             Some(quote! {
                 golem_agentic::bindings::golem::agentic::common::AgentMethod {
                     name: stringify!(#name).to_string(),
                     description: #description.to_string(),
                     prompt_hint: None,
                     input_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
-                          parameters:vec![::golem_agentic::bindings::golem::agentic::common::ParameterType::Text(::golem_agentic::bindings::golem::agentic::common::TextType {
-                            language_code: "en".to_string(), // unused - since I am assuming WitType::String always for demo
-                          })],
+                          parameters:  parameter_types.iter().map(|ty| {::golem_agentic::bindings::golem::agentic::common::ParameterType::Wit(ty.clone())}).collect::<Vec<_>>()
                     }),
                     output_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
-                      parameters:vec![::golem_agentic::bindings::golem::agentic::common::ParameterType::Text(::golem_agentic::bindings::golem::agentic::common::TextType {
-                       language_code: "en".to_string(),   // unused - since I am assuming WitType::String always for demo
-                      })],
+                      parameters: result_type.iter().map(|ty| {::golem_agentic::bindings::golem::agentic::common::ParameterType::Wit(ty.clone())}).collect::<Vec<_>>()
                     }),
                 }
             })
