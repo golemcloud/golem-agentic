@@ -133,12 +133,12 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
                     prompt_hint: None,
                     input_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
                           parameters:vec![::golem_agentic::bindings::golem::agentic::common::ParameterType::Text(::golem_agentic::bindings::golem::agentic::common::TextType {
-                            language_code: "abc".to_string(),
+                            language_code: "en".to_string(), // unused - since I am assuming WitType::String always for demo
                           })],
                     }),
                     output_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
                       parameters:vec![::golem_agentic::bindings::golem::agentic::common::ParameterType::Text(::golem_agentic::bindings::golem::agentic::common::TextType {
-                       language_code: "".to_string(), // TODO: Din't understand what exactly this is.
+                       language_code: "en".to_string(),   // unused - since I am assuming WitType::String always for demo
                       })],
                     }),
                 }
