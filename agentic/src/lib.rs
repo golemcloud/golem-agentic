@@ -1,5 +1,5 @@
-use crate::bindings::exports::golem::agentic_guest::guest::{AgentDefinition, Guest, GuestAgent};
 use crate::bindings::exports::golem::agentic_guest::guest::StatusUpdate;
+use crate::bindings::exports::golem::agentic_guest::guest::{AgentDefinition, Guest, GuestAgent};
 
 pub mod agent;
 pub mod agent_registry;
@@ -29,13 +29,17 @@ impl GuestAgent for ResolvedAgent {
                 agent_definitions.iter().map(|x| x.agent_name.clone()).collect::<Vec<_>>().join(", ")).as_str()
         );
 
-        let agent_impl_resolver = agent_registry::get_agent_impl_by_def(agent_definition.agent_name.clone());
+        let agent_impl_resolver =
+            agent_registry::get_agent_impl_by_def(agent_definition.agent_name.clone());
 
         if let Some(resolver) = agent_impl_resolver {
             let agent = resolver.resolve_agent_impl(agent_id, agent_name);
             ResolvedAgent { agent }
         } else {
-            panic!("No agent implementation found for agent definition: {}", agent_name);
+            panic!(
+                "No agent implementation found for agent definition: {}",
+                agent_name
+            );
         }
     }
 

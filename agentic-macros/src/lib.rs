@@ -1,14 +1,13 @@
-
 extern crate proc_macro;
-use proc_macro::TokenStream;
 use golem_wasm_ast::analysis::analysed_type::*;
 use golem_wasm_rpc::{ResourceMode, WitTypeNode};
+use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 
+use golem_agentic::bindings::golem::agentic::common::WitType;
 #[allow(unused_imports)]
 use lazy_static::lazy_static;
 use syn::{parse_macro_input, Data, DeriveInput, Fields, Meta};
-use golem_agentic::bindings::golem::agentic::common::WitType;
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -447,7 +446,6 @@ fn get_wit_type(ty: &syn::Type) -> Option<WitType> {
     } else {
         None
     }?;
-
 
     Some(WitType::from(analysed_type))
 }
