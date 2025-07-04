@@ -34,7 +34,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let method_impls = tr.items.iter().filter_map(|item| {
         if let syn::TraitItem::Fn(method) = item {
             let method_name = &method.sig.ident;
-            let method_name_str = method_name.to_string();
+            let method_name_str = to_kebab_case(&method_name.to_string());
 
             let inputs: Vec<_> = method.sig.inputs.iter().collect();
 
@@ -103,11 +103,13 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
-    let agent_name = tr.ident.to_string();
+    let agent_name = to_kebab_case(&tr.ident.to_string());
 
     let methods = tr.items.iter().filter_map(|item| {
         if let syn::TraitItem::Fn(trait_fn) = item {
             let name = &trait_fn.sig.ident;
+            let method_name = to_kebab_case(&name.to_string());
+
             let mut description = String::new();
 
             for attr in &trait_fn.attrs {
@@ -188,7 +190,7 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
 
             Some(quote! {
                 golem_agentic::bindings::golem::agentic::common::AgentMethod {
-                    name: stringify!(#name).to_string(),
+                    name: #method_name.to_string(),
                     description: #description.to_string(),
                     prompt_hint: None,
                     input_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
@@ -230,7 +232,9 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         .into();
     };
 
-    let trait_name_str = trait_name.to_string();
+    let trait_name_str_raw = trait_name.to_string();
+    let trait_name_str = to_kebab_case(&trait_name_str_raw);
+
 
     let self_ty = &impl_block.self_ty;
 
@@ -238,7 +242,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
     for item in &impl_block.items {
         if let syn::ImplItem::Fn(method) = item {
-            let method_name = method.sig.ident.to_string();
+            let method_name = to_kebab_case(&method.sig.ident.to_string());
 
             let param_idents: Vec<_> = method
                 .sig
@@ -306,7 +310,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     };
 
-    let register_impl_fn = format_ident!("register_agent_impl_{}", trait_name_str.to_lowercase());
+    let register_impl_fn = format_ident!("register_agent_impl_{}", trait_name_str_raw.to_lowercase());
 
     let register_impl_fn = quote! {
         #[::ctor::ctor]
@@ -547,4 +551,23 @@ fn wit_type_to_tokens(ty: &WitType) -> proc_macro2::TokenStream {
             nodes: vec![#(#nodes_tokens),*]
         }
     }
+}
+
+fn to_kebab_case(s: &str) -> String {
+    let mut result = String::new();
+
+    for (i, c) in s.chars().enumerate() {
+        if c == '_' {
+            result.push('-');
+        } else if c.is_uppercase() {
+            if i != 0 {
+                result.push('-');
+            }
+            result.push(c.to_ascii_lowercase());
+        } else {
+            result.push(c);
+        }
+    }
+
+    result
 }
