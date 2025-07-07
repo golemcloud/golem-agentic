@@ -367,12 +367,15 @@ dependencies = [
 name = "golem-agentic"
 version = "0.0.0"
 dependencies = [
+ "ctor",
+ "golem-wasm-ast",
  "golem-wasm-rpc",
  "log",
  "mime",
  "nom",
  "once_cell",
  "reqwest",
+ "serde_json",
  "thiserror",
  "wasi-logger",
  "wit-bindgen 0.40.0",
@@ -399,6 +402,8 @@ dependencies = [
  "itertools",
  "mappable-rc",
  "semver",
+ "serde",
+ "serde_json",
  "wasm-metadata 0.227.1",
 ]
 

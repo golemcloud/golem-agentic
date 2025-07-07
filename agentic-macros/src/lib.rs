@@ -287,7 +287,10 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
             fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::bindings::golem::agentic::common::StatusUpdate {
                 match method_name.as_str() {
                     #(#match_arms,)*
-                    _ =>  ::golem_agentic::bindings::golem::agentic::common::StatusUpdate::Error(::golem_agentic::bindings::golem::agentic::common::Error::NetworkError)
+                    _ =>  ::golem_agentic::bindings::golem::agentic::common::StatusUpdate::Emit(format!(
+                        "Method '{}' not found in agent '{}'",
+                        method_name, #trait_name_str
+                    )),
                 }
             }
 
