@@ -84,9 +84,10 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         impl #remote_trait_name {
-            pub fn new(agent_id: String) -> Self {
-                let inner =  ::golem_agentic::bindings::golem::api::host::RemoteAgent::new(&::golem_agentic::bindings::golem::agentic::common::AgentDependency { agent_name: #agent_definition.agent_name, methods: #agent_definition.methods}, agent_id.as_str());
-                Self { inner }
+            pub fn new() -> Result<Self, String> {
+                // this ensures you use a different node to invoke methods on the agent, addressing scalability
+                let inner =  ::golem_agentic::bindings::golem::api::host::create_remote_agent(&::golem_agentic::bindings::golem::agentic::common::AgentDependency { agent_name: #agent_definition.agent_name, methods: #agent_definition.methods})?;
+                Ok(Self { inner })
             }
 
             #(#method_impls)*
