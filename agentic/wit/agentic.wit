@@ -4,7 +4,9 @@ interface guest {
     use golem:agentic/common.{status-update, agent-definition};
 
     resource agent {
-        constructor(agent-name: string, agent-id: string);
+        constructor(agent-name: string);
+
+        get-agent-id: func() -> string;
 
         invoke: func(method-name: string, input: list<string>) -> status-update;
 

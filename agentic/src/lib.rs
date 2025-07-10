@@ -4,7 +4,7 @@ use crate::bindings::exports::golem::agentic_guest::guest::{AgentDefinition, Gue
 pub mod agent;
 pub mod agent_registry;
 pub mod bindings;
-pub mod generate_component;
+pub mod agent_instance_counter;
 
 pub struct ResolvedAgent {
     pub agent: ::std::sync::Arc<dyn agent::Agent + Send + Sync>,
@@ -21,7 +21,7 @@ impl Guest for Component {
 }
 
 impl GuestAgent for ResolvedAgent {
-    fn new(agent_name: String, agent_id: String) -> Self {
+    fn new(agent_name: String) -> Self {
         let agent_definitions = agent_registry::get_all_agent_definitions();
 
         let agent_definition = agent_definitions.iter().find(|x| x.agent_name == agent_name).expect(
@@ -33,7 +33,7 @@ impl GuestAgent for ResolvedAgent {
             agent_registry::get_agent_impl_by_def(agent_definition.agent_name.clone());
 
         if let Some(resolver) = agent_impl_resolver {
-            let agent = resolver.resolve_agent_impl(agent_id, agent_name);
+            let agent = resolver.resolve_agent_impl(agent_name);
             ResolvedAgent { agent }
         } else {
             panic!(
@@ -41,6 +41,10 @@ impl GuestAgent for ResolvedAgent {
                 agent_name
             );
         }
+    }
+
+    fn get_agent_id(&self) -> String {
+        self.agent.agent_id()
     }
 
     fn invoke(&self, method_name: String, input: Vec<String>) -> StatusUpdate {
