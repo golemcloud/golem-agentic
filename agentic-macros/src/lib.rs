@@ -319,7 +319,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         struct #resolver;
 
         impl golem_agentic::agent_registry::Resolver for #resolver {
-            fn resolve_agent_impl(&self, agent_name: String) -> ::std::sync::Arc<dyn golem_agentic::agent::Agent + Send + Sync> {
+            fn resolve_agent_impl(&self) -> ::std::sync::Arc<dyn golem_agentic::agent::Agent + Send + Sync> {
                  golem_agentic::agent_instance_counter::create_agent_id(#trait_name_str.to_string());
 
                 let agent_id =

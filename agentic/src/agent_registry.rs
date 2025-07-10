@@ -60,6 +60,5 @@ pub fn get_agent_impl_by_def(
 pub trait Resolver: Send + Sync {
     fn resolve_agent_impl(
         &self,
-        agent_name: String,
     ) -> Arc<dyn Agent + Send + Sync>;
 }
