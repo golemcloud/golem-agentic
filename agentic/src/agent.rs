@@ -29,5 +29,5 @@ pub trait Agent: Send + Sync {
 }
 
 pub trait GetAgentId {
-    fn get_agent_id(&self) -> String;
+    fn get_agent_id() -> String;
 }

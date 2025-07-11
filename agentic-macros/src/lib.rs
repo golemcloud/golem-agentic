@@ -236,7 +236,6 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     let trait_name_str_raw = trait_name.to_string();
     let trait_name_str = to_kebab_case(&trait_name_str_raw);
 
-
     let self_ty = &impl_block.self_ty;
 
     let mut match_arms = Vec::new();
@@ -286,14 +285,14 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     let base_agent_impl = quote! {
 
         impl golem_agentic::agent::GetAgentId for #self_ty {
-           fn get_agent_id(&self) -> String {
-                golem_agentic::agent_instance_counter::get_agent_id(#trait_name_str.to_string())
+           fn get_agent_id() -> String {
+                golem_agentic::agent_instance_registry::create_agent_id(#trait_name_str.to_string())
            }
         }
 
         impl golem_agentic::agent::Agent for #self_ty {
             fn agent_id(&self) -> String {
-                golem_agentic::agent::GetAgentId::get_agent_id(self)
+               #self_ty::get_agent_id()
             }
 
             fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::bindings::golem::agentic::common::StatusUpdate {
@@ -313,32 +312,53 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     };
 
-    let resolver = format_ident!("{}Resolver", trait_name);
+    let initiator = format_ident!("{}Initiator", trait_name);
 
     let base_resolver_impl = quote! {
-        struct #resolver;
+        struct #initiator;
 
-        impl golem_agentic::agent_registry::Resolver for #resolver {
-            fn resolve_agent_impl(&self) -> ::std::sync::Arc<dyn golem_agentic::agent::Agent + Send + Sync> {
-                 golem_agentic::agent_instance_counter::create_agent_id(#trait_name_str.to_string());
+        impl golem_agentic::agent_registry::AgentInitiator for #initiator {
+            fn initiate(&self) -> golem_agentic::bindings::exports::golem::agentic_guest::guest::AgentRef {
+                 let agent_id = #self_ty::get_agent_id();
 
-                let agent_id =
-                    golem_agentic::agent_instance_counter::get_agent_id(#trait_name_str.to_string());
+                 let agent = ::std::sync::Arc::new(#self_ty {agent_id: agent_id.clone()});
 
-                 // currently we inject only agent_id and nothing else
-                 ::std::sync::Arc::new(#self_ty {agent_id})
+                 let resolved_agent = golem_agentic::ResolvedAgent {
+                      agent: agent
+                 };
+
+                 let agent =
+                     golem_agentic::bindings::exports::golem::agentic_guest::guest::Agent::new(resolved_agent.clone());
+
+                 let handle = agent.handle();
+
+                 golem_agentic::agent_registry::register_agent_instance(
+                    golem_agentic::agent_registry::AgentId(agent_id.clone()),
+                    #trait_name_str.to_string(),
+                    agent,
+                    resolved_agent
+                );
+
+                golem_agentic::bindings::exports::golem::agentic_guest::guest::AgentRef {
+                    agent_id: agent_id.clone(),
+                    agent_name: #trait_name_str.to_string(),
+                    agent_handle: handle
+                }
             }
         }
     };
 
-    let register_impl_fn = format_ident!("register_agent_impl_{}", trait_name_str_raw.to_lowercase());
+    let register_impl_fn = format_ident!(
+        "register_agent_initiator_{}",
+        trait_name_str_raw.to_lowercase()
+    );
 
     let register_impl_fn = quote! {
         #[::ctor::ctor]
         fn #register_impl_fn() {
-            golem_agentic::agent_registry::register_agent_impl(
+            golem_agentic::agent_registry::register_agent_initiator(
                #trait_name_str.to_string(),
-               ::std::sync::Arc::new(#resolver)
+               ::std::sync::Arc::new(#initiator)
             );
         }
     };

@@ -9,7 +9,7 @@ pub type AgentId = String;
 static AGENT_INSTANCE_COUNTER: Lazy<Mutex<HashMap<AgentName, u64>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-static AGENT_INSTANCE_ID: Lazy<Mutex<HashMap<AgentName, String>>> =
+static AGENT_INSTANCE_ID: Lazy<Mutex<HashMap<AgentName, Vec<String>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub fn increment_agent_instance_counter(agent_name: AgentName) -> u64 {
@@ -19,7 +19,8 @@ pub fn increment_agent_instance_counter(agent_name: AgentName) -> u64 {
     *count
 }
 
-pub fn create_agent_id(agent_name: AgentName)  {
+// TODO: Chance of deadlock. Fix this
+pub fn create_agent_id(agent_name: AgentName) -> AgentId  {
     let mut id_map = AGENT_INSTANCE_ID.lock().unwrap();
 
     let count = increment_agent_instance_counter(agent_name.clone());
@@ -29,12 +30,9 @@ pub fn create_agent_id(agent_name: AgentName)  {
 
     let agent_id = format!("{}-{}-{}", worker_name, agent_name, count);
 
-    id_map.insert(agent_name.clone(), agent_id.clone());
-}
+    id_map.entry(agent_name).or_default().push(agent_id.clone());
 
-pub fn get_agent_id(agent_name: AgentName) -> String {
-    let id_map = AGENT_INSTANCE_ID.lock().unwrap();
-    id_map.get(&agent_name).cloned().unwrap()
+    agent_id
 }
 
 pub fn get_agent_instance_count(agent_name: AgentName) -> u64 {
