@@ -291,10 +291,6 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
 
         impl golem_agentic::agent::Agent for #self_ty {
-            fn agent_id(&self) -> String {
-               #self_ty::get_agent_id()
-            }
-
             fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::bindings::golem::agentic::common::StatusUpdate {
                 match method_name.as_str() {
                     #(#match_arms,)*
@@ -324,7 +320,8 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
                  let agent = ::std::sync::Arc::new(#self_ty {agent_id: agent_id.clone()});
 
                  let resolved_agent = golem_agentic::ResolvedAgent {
-                      agent: agent
+                      agent: agent,
+                      agent_id: agent_id.clone(),
                  };
 
                  let agent =

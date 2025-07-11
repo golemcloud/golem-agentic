@@ -59,7 +59,7 @@ pub fn get_agent_instances_by_prefix(
         .filter_map(|(agent_id, agent_ref_internal)| {
             if agent_id.0.starts_with(prefix) {
                 Some(AgentRef {
-                    agent_id: agent_ref_internal.resolved_agent.agent.agent_id(),
+                    agent_id: agent_ref_internal.resolved_agent.agent_id.clone(),
                     agent_name: agent_ref_internal.agent_name.clone(),
                     agent_handle: agent_ref_internal.inner_instance.handle(),
                 })

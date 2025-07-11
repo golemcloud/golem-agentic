@@ -11,6 +11,7 @@ pub mod bindings;
 #[derive(Clone)]
 pub struct ResolvedAgent {
     pub agent: ::std::sync::Arc<dyn agent::Agent + Send + Sync>,
+    pub agent_id: String
 }
 
 struct Component;
@@ -76,7 +77,7 @@ impl Guest for Component {
 
 impl GuestAgent for ResolvedAgent {
     fn get_agent_id(&self) -> String {
-        self.agent.agent_id()
+        self.agent_id.clone()
     }
 
     fn invoke(&self, method_name: String, input: Vec<String>) -> StatusUpdate {
