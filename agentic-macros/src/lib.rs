@@ -14,6 +14,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let tr = syn::parse_macro_input!(item as syn::ItemTrait);
     let tr_name = tr.ident.clone();
     let tr_name_str = tr_name.to_string();
+    let tr_name_str_kebab = to_kebab_case(&tr_name_str);
     let fn_suffix = &tr_name.to_string().to_lowercase();
     let fn_name = format_ident!("register_agent_definition_{}", fn_suffix); // may be ctor is not required. But works now
 
@@ -23,7 +24,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
         #[::ctor::ctor]
         fn #fn_name() {
             golem_agentic::agent_registry::register_agent_definition(
-               #tr_name_str.to_string(),
+               #tr_name_str_kebab.to_string(),
                 #agent_definition
             );
         }
@@ -314,7 +315,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         struct #initiator;
 
         impl golem_agentic::agent_registry::AgentInitiator for #initiator {
-            fn initiate(&self) -> golem_agentic::bindings::exports::golem::agentic_guest::guest::AgentRef {
+            fn initiate(&self) -> golem_agentic::ResolvedAgent {
                  let agent_id = #self_ty::get_agent_id();
 
                  let agent = ::std::sync::Arc::new(#self_ty {agent_id: agent_id.clone()});
@@ -333,14 +334,10 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
                     golem_agentic::agent_registry::AgentId(agent_id.clone()),
                     #trait_name_str.to_string(),
                     agent,
-                    resolved_agent
+                    resolved_agent.clone()
                 );
 
-                golem_agentic::bindings::exports::golem::agentic_guest::guest::AgentRef {
-                    agent_id: agent_id.clone(),
-                    agent_name: #trait_name_str.to_string(),
-                    agent_handle: handle
-                }
+                 resolved_agent
             }
         }
     };

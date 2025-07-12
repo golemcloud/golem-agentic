@@ -10,6 +10,8 @@ interface guest {
     }
 
     resource agent {
+        constructor(agent-id: string);
+
         get-agent-id: func() -> string;
 
         invoke: func(method-name: string, input: list<string>) -> status-update;
@@ -19,8 +21,6 @@ interface guest {
         /// export-state: func() -> result<wit-value, error>;
         /// import-state: func(wit-value) -> result<_, error>;
     }
-
-    create-agent: func(agent-name: string) -> agent-ref;
 
     get-agent: func(agent-id: string) -> agent-ref;
 

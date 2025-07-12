@@ -126,5 +126,5 @@ pub fn get_agent_initiator(
 }
 
 pub trait AgentInitiator: Send + Sync {
-    fn initiate(&self) -> AgentRef;
+    fn initiate(&self) -> ResolvedAgent;
 }

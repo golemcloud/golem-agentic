@@ -51,8 +51,10 @@ impl Guest for Component {
 
         agents
     }
+}
 
-    fn create_agent(agent_name: String) -> AgentRef {
+impl GuestAgent for ResolvedAgent {
+    fn new(agent_name: String) -> ResolvedAgent {
         let agent_definitions = agent_registry::get_all_agent_definitions();
 
         let agent_definition = agent_definitions.iter().find(|x| x.agent_name == agent_name).expect(
@@ -73,9 +75,7 @@ impl Guest for Component {
             );
         }
     }
-}
 
-impl GuestAgent for ResolvedAgent {
     fn get_agent_id(&self) -> String {
         self.agent_id.clone()
     }
