@@ -316,6 +316,9 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
         impl golem_agentic::agent_registry::AgentInitiator for #initiator {
             fn initiate(&self) -> golem_agentic::ResolvedAgent {
+
+                 use golem_agentic::agent::{GetAgentId};
+
                  let agent_id = #self_ty::get_agent_id();
 
                  let agent = ::std::sync::Arc::new(#self_ty {agent_id: agent_id.clone()});
