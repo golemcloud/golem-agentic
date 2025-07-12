@@ -79,6 +79,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
         }
     });
 
+
     let remote_client = quote! {
         pub struct #remote_trait_name {
             inner: ::golem_agentic::bindings::golem::api::host::RemoteAgent,
@@ -239,6 +240,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
     let self_ty = &impl_block.self_ty;
 
+
     let mut match_arms = Vec::new();
 
     for item in &impl_block.items {
@@ -360,11 +362,26 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     };
 
+    let local_trait_name = format_ident!("Local{}", trait_name);
+
+
+    let local_client = quote! {
+        pub struct #local_trait_name;
+
+        impl #local_trait_name {
+            pub fn new(agent_id: &str) -> Arc<dyn #trait_name + Send + Sync> {
+                // this ensures you use a different node to invoke methods on the agent, addressing scalability
+                Arc::new(#self_ty {agent_id: agent_id.to_string()})
+            }
+        }
+    };
+
     let result = quote! {
         #impl_block
         #base_agent_impl
         #base_resolver_impl
         #register_impl_fn
+        #local_client
     };
 
     result.into()
