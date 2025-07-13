@@ -10,7 +10,7 @@ interface guest {
     }
 
     resource agent {
-        constructor(agent-id: string);
+        constructor(agent-name: string);
 
         get-agent-id: func() -> string;
 

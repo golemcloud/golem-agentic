@@ -369,9 +369,9 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         pub struct #local_trait_name;
 
         impl #local_trait_name {
-            pub fn new(agent_id: &str) -> Arc<dyn #trait_name + Send + Sync> {
+            pub fn new(agent_id: &str) -> ::std::sync::Arc<dyn #trait_name + Send + Sync> {
                 // this ensures you use a different node to invoke methods on the agent, addressing scalability
-                Arc::new(#self_ty {agent_id: agent_id.to_string()})
+                 ::std::sync::Arc::new(#self_ty {agent_id: agent_id.to_string()})
             }
         }
     };
