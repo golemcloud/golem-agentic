@@ -1,17 +1,23 @@
+use crate::agent::parse_agent_id;
 use crate::agent_registry::AgentId;
 use crate::bindings::exports::golem::agentic_guest::guest::{Agent, AgentRef, StatusUpdate};
 use crate::bindings::exports::golem::agentic_guest::guest::{AgentDefinition, Guest, GuestAgent};
 use crate::bindings::golem::api::host;
+use golem_wasm_rpc::{WasmRpc, WitValue};
+use serde_json::Value;
+
+pub use type_mapping::*;
 
 pub mod agent;
 pub mod agent_instance_registry;
 pub mod agent_registry;
 pub mod bindings;
+mod type_mapping;
 
 #[derive(Clone)]
 pub struct ResolvedAgent {
     pub agent: ::std::sync::Arc<dyn agent::Agent + Send + Sync>,
-    pub agent_id: String
+    pub agent_id: String,
 }
 
 struct Component;
@@ -24,8 +30,22 @@ impl Guest for Component {
     }
 
     fn get_agent(agent_id: String) -> AgentRef {
-        agent_registry::get_agent_instance(AgentId(agent_id.clone()))
-            .expect("Agent with ID {} not found. Available agents in this app are: {}")
+        let result = agent_registry::get_agent_instance(AgentId(agent_id.clone()));
+
+        if let Some(agent_ref) = result {
+            agent_ref
+        } else {
+            let available_agents = Self::discover_agents()
+                .iter()
+                .map(|x| x.agent_id.clone())
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            panic!(
+                "Agent with id {} not found. Available agents: {}",
+                agent_id, available_agents
+            );
+        }
     }
 
     fn discover_agents() -> Vec<AgentRef> {
@@ -34,13 +54,12 @@ impl Guest for Component {
             .map(|x| x.agent_name.clone())
             .collect::<Vec<_>>();
 
-        // TODO; this can be improved, currently just trying out
         let worker_name = host::get_self_metadata().worker_id.worker_name.clone();
 
         let mut agents = Vec::new();
 
         for agent_name in agent_names {
-            let prefix = format!("{}-{}", worker_name, agent_name);
+            let prefix = format!("{}--{}", worker_name, agent_name);
 
             agent_registry::get_agent_instances_by_prefix(&prefix)
                 .into_iter()

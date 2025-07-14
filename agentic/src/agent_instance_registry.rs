@@ -1,7 +1,7 @@
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::Mutex;
-use once_cell::sync::Lazy;
 
 pub type AgentName = String;
 pub type AgentId = String;
@@ -20,15 +20,17 @@ pub fn increment_agent_instance_counter(agent_name: AgentName) -> u64 {
 }
 
 // TODO: Chance of deadlock. Fix this
-pub fn create_agent_id(agent_name: AgentName) -> AgentId  {
+pub fn create_agent_id(agent_name: AgentName) -> AgentId {
     let mut id_map = AGENT_INSTANCE_ID.lock().unwrap();
 
     let count = increment_agent_instance_counter(agent_name.clone());
 
-    let worker_name =
-        crate::bindings::golem::api::host::get_self_metadata().worker_id.worker_name.clone();
+    let worker_name = crate::bindings::golem::api::host::get_self_metadata()
+        .worker_id
+        .worker_name
+        .clone();
 
-    let agent_id = format!("{}-{}-{}", worker_name, agent_name, count);
+    let agent_id = format!("{}--{}--{}", worker_name, agent_name, count);
 
     id_map.entry(agent_name).or_default().push(agent_id.clone());
 
