@@ -124,6 +124,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
         pub struct #remote_trait_name {
             handle: golem_wasm_rpc::Value,
             worker_id: golem_wasm_rpc::WorkerId,
+            agent_id: String,
         }
 
         impl #remote_trait_name {
@@ -141,16 +142,44 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                 match value  {
                     golem_wasm_rpc::Value::Tuple(values) => {
                         let handle = values[0].clone();
+                             let handle_wit = golem_wasm_rpc::WitValue::from(handle.clone());
+
+                        let new_agent_id = rpc.invoke_and_await(
+                          "golem:agentic-guest/guest.{[method]agent.get-agent-id}",
+                          &[handle_wit]
+                        ).map_err(|e| format!("Failed to invoke get-agent: {}", e))?;
+
+                        let new_agent_id_tuple_value = golem_wasm_rpc::Value::from(new_agent_id);
+
+                        let new_agent_id = match new_agent_id_tuple_value {
+                            golem_wasm_rpc::Value::Tuple(values) => {
+                                let agent = values[0].clone();
+
+                                match agent {
+                                    golem_wasm_rpc::Value::String(agent_id) => agent_id.to_string(),
+                                    _ => {
+                                        panic!("Expected agent_id to be a String, but got: {:?}", agent);
+                                    }
+                                }
+                            }
+
+                            _ => {
+                                panic!("Expected get-agent-id to return a tuple, but got: {:?}", new_agent_id_tuple_value);
+                            }
+                        };
+
                         let worker_name = match handle.clone() {
                             golem_wasm_rpc::Value::Handle {uri, ..} => {
                                 let uri = uri.split('/').collect::<Vec<_>>();
                                 uri.get(uri.len() - 1).expect("Worker name not found in URI").clone().to_string()
                             }
+
                             _  => {
                                 panic!("Expected handle to be a tuple, but got: {:?}", handle);
                             }
                         };
-                        Ok(Self { handle: handle.clone(), worker_id: golem_wasm_rpc::WorkerId { component_id: current_component_id, worker_name: worker_name } })
+
+                        Ok(Self { agent_id: new_agent_id, handle: handle.clone(), worker_id: golem_wasm_rpc::WorkerId { component_id: current_component_id, worker_name: worker_name } })
                     }
                     _ => {
                         Err(format!("Expected agent_info to be a tuple, but got: {:?}", value))
@@ -159,17 +188,19 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             pub fn connect_agent(agent_id: &str) -> Result<Self, String> {
+                let agent_id_cloned = agent_id.to_string();
+
                 let current_component_id = ::golem_agentic::bindings::golem::api::host::get_self_metadata().worker_id.component_id;
                 let agent_info = golem_agentic::agent::parse_agent_id(&agent_id);
 
                 let worker_name = match agent_info {
-                  Ok(agent_info) => agent_info.worker_name,
-                  Err(e) => panic!("Failed to parse agent id: {}", e),
+                   Ok(agent_info) => agent_info.worker_name,
+                   Err(e) => panic!("Failed to parse agent id: {}", e),
                 };
 
                 let worker_id = golem_wasm_rpc::WorkerId {
-                  worker_name: worker_name.clone(),
-                  component_id: current_component_id.clone(),
+                   worker_name: worker_name.clone(),
+                   component_id: current_component_id.clone(),
                 };
 
                 let rpc = golem_wasm_rpc::WasmRpc::new(&worker_id);
@@ -222,7 +253,15 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                    }
                };
 
-                Ok(Self { handle: handle, worker_id: worker_id })
+                Ok(Self { agent_id: agent_id_cloned, handle: handle, worker_id: worker_id })
+            }
+
+            pub fn get_agent_id(&self) -> String {
+                self.agent_id.clone()
+            }
+
+            pub fn get_container_id(&self) -> golem_wasm_rpc::WorkerId {
+                self.worker_id.clone()
             }
 
             #(#method_impls)*
