@@ -3,7 +3,8 @@ resolver = "2"
 
 members = [
     "agentic",
-    "agentic-macros"
+    "agentic-macros",
+    "agent-definition-extractor-prototype"
 ]
 
 [profile.release]
