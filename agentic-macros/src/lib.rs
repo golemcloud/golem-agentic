@@ -35,7 +35,20 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let method_impls = tr.items.iter().filter_map(|item| {
         if let syn::TraitItem::Fn(method) = item {
             let method_name = &method.sig.ident;
-            let method_name_str = to_kebab_case(&method_name.to_string());
+            let method_name_str = method_name.to_string();
+            let method_name_str_kebab = to_kebab_case(&method_name_str);
+
+            let wrapped_component_method_name_str = format!(
+                "golem:simulated-agentic/simulated-agent.{{[method]{}.{}}}",
+                tr_name_str_kebab,
+                method_name_str_kebab
+            );
+
+            let wrapped_component_method_name = {
+                quote! {
+                   #wrapped_component_method_name_str
+                }
+            };
 
             let inputs: Vec<_> = method.sig.inputs.iter().collect();
 
@@ -70,24 +83,17 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                     let rpc = golem_wasm_rpc::WasmRpc::new(&self.worker_id);
                     let mut inputs = vec![
                         golem_wasm_rpc::WitValue::from(self.handle.clone()),
-                       // golem_wasm_rpc::WitValue::from(golem_wasm_rpc::Value::String(#method_name_str.to_string())),
                     ];
 
-                    let x : Vec<golem_wasm_rpc::Value> = #input_vec_wit;
+                    let input_arg_values : Vec<golem_wasm_rpc::Value> = #input_vec_wit;
 
-                    for i in x.iter() {
-                       let wit_value: golem_wasm_rpc::WitValue = golem_wasm_rpc::WitValue::from(i.clone());
-                       inputs.push(wit_value);
+                    for arg in input_arg_values.iter() {
+                       let arg_wit_value: golem_wasm_rpc::WitValue = golem_wasm_rpc::WitValue::from(arg.clone());
+                       inputs.push(arg_wit_value);
                     }
 
-                    // let value = golem_wasm_rpc::Value::List(#input_vec_wit);
-                    // let wit_value = golem_wasm_rpc::WitValue::from(value);
-                    //
-                    // // golem:simulated-agentic/simulated-agentic.{weather-agent.new}
-                    // inputs.push(wit_value);
-
                     let result: golem_wasm_rpc::WitValue = rpc.invoke_and_await(
-                        "golem:simulated-agentic/simulated-agent.{[method]weather-agent.get-weather}",
+                        #wrapped_component_method_name,
                         inputs.as_slice()
                     ).map_err(|e| format!("Failed to call agent.invoke with inputs {:?}. {}", inputs, e)).expect(
                         "Failed to get agent info"
