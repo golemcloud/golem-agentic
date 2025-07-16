@@ -1,10 +1,8 @@
-use crate::agent::parse_agent_id;
 use crate::agent_registry::AgentId;
 use crate::bindings::exports::golem::agentic_guest::guest::{Agent, AgentRef, StatusUpdate};
 use crate::bindings::exports::golem::agentic_guest::guest::{AgentDefinition, Guest, GuestAgent};
 use crate::bindings::golem::api::host;
-use golem_wasm_rpc::{WasmRpc, WitValue};
-use serde_json::Value;
+use golem_wasm_rpc::{WitValue};
 
 pub use type_mapping::*;
 
@@ -99,7 +97,7 @@ impl GuestAgent for ResolvedAgent {
         self.agent_id.clone()
     }
 
-    fn invoke(&self, method_name: String, input: Vec<String>) -> StatusUpdate {
+    fn invoke(&self, method_name: String, input: Vec<WitValue>) -> StatusUpdate {
         self.agent.invoke(method_name, input)
     }
 

@@ -2,7 +2,11 @@ package golem:agentic-guest;
 
 interface guest {
     use golem:agentic/common.{status-update, agent-definition};
+    use golem:rpc/types@0.2.1.{wit-value};
 
+    // This is not quite right, we really need a host function that keeps track
+    // of the resources constructed explicitly within the component using a host
+    // function and will be done during the time of implementation
     record agent-ref {
         agent-id: string,
         agent-name: string,
@@ -14,7 +18,9 @@ interface guest {
 
         get-agent-id: func() -> string;
 
-        invoke: func(method-name: string, input: list<string>) -> status-update;
+        // In the future, it will be possible
+        // in the future, this will be result
+        invoke: func(method-name: string, input: list<wit-value>) -> status-update;
 
         get-definition: func() -> agent-definition;
 
