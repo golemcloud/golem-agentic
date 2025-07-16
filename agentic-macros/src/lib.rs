@@ -1,12 +1,7 @@
 extern crate proc_macro;
-use golem_wasm_ast::analysis::analysed_type::*;
-use golem_wasm_rpc::{ResourceMode, WitTypeNode};
+
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-
-use golem_agentic::bindings::golem::agentic::common::WitType;
-#[allow(unused_imports)]
-use lazy_static::lazy_static;
 use syn::{parse_macro_input, Data, DeriveInput, Fields, Meta};
 
 #[proc_macro_attribute]
@@ -35,7 +30,20 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let method_impls = tr.items.iter().filter_map(|item| {
         if let syn::TraitItem::Fn(method) = item {
             let method_name = &method.sig.ident;
-            let method_name_str = to_kebab_case(&method_name.to_string());
+            let method_name_str = method_name.to_string();
+            let method_name_str_kebab = to_kebab_case(&method_name_str);
+
+            let wrapped_component_method_name_str = format!(
+                "golem:simulated-agentic/simulated-agent.{{[method]{}.{}}}",
+                tr_name_str_kebab,
+                method_name_str_kebab
+            );
+
+            let wrapped_component_method_name = {
+                quote! {
+                   #wrapped_component_method_name_str
+                }
+            };
 
             let inputs: Vec<_> = method.sig.inputs.iter().collect();
 
@@ -70,16 +78,17 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                     let rpc = golem_wasm_rpc::WasmRpc::new(&self.worker_id);
                     let mut inputs = vec![
                         golem_wasm_rpc::WitValue::from(self.handle.clone()),
-                        golem_wasm_rpc::WitValue::from(golem_wasm_rpc::Value::String(#method_name_str.to_string())),
                     ];
 
-                    let value = golem_wasm_rpc::Value::List(#input_vec_wit);
-                    let wit_value = golem_wasm_rpc::WitValue::from(value);
+                    let input_arg_values : Vec<golem_wasm_rpc::Value> = #input_vec_wit;
 
-                    inputs.push(wit_value);
+                    for arg in input_arg_values.iter() {
+                       let arg_wit_value: golem_wasm_rpc::WitValue = golem_wasm_rpc::WitValue::from(arg.clone());
+                       inputs.push(arg_wit_value);
+                    }
 
                     let result: golem_wasm_rpc::WitValue = rpc.invoke_and_await(
-                        "golem:agentic-guest/guest.{[method]agent.invoke}",
+                        #wrapped_component_method_name,
                         inputs.as_slice()
                     ).map_err(|e| format!("Failed to call agent.invoke with inputs {:?}. {}", inputs, e)).expect(
                         "Failed to get agent info"
@@ -124,7 +133,6 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
         pub struct #remote_trait_name {
             handle: golem_wasm_rpc::Value,
             worker_id: golem_wasm_rpc::WorkerId,
-            agent_id: String,
         }
 
         impl #remote_trait_name {
@@ -133,9 +141,10 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                 let rpc = golem_wasm_rpc::WasmRpc::ephemeral(current_component_id.clone());
                 let agent_name = golem_wasm_rpc::Value::String(#agent_definition.agent_name.to_string());
                 let agent_name_wit_value = &[golem_wasm_rpc::WitValue::from(agent_name.clone())];
+
                 let agent_handle_in_vec = rpc.invoke_and_await(
-                    "golem:agentic-guest/guest.{agent.new}",
-                    agent_name_wit_value
+                    "golem:simulated-agentic/simulated-agent.{weather-agent.new}",
+                    &[]
                 ).map_err(|e| format!("Failed to invoke get-agent: {}", e))?;
 
                 let value = golem_wasm_rpc::Value::from(agent_handle_in_vec);
@@ -143,30 +152,6 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                     golem_wasm_rpc::Value::Tuple(values) => {
                         let handle = values[0].clone();
                              let handle_wit = golem_wasm_rpc::WitValue::from(handle.clone());
-
-                        let new_agent_id = rpc.invoke_and_await(
-                          "golem:agentic-guest/guest.{[method]agent.get-agent-id}",
-                          &[handle_wit]
-                        ).map_err(|e| format!("Failed to invoke get-agent: {}", e))?;
-
-                        let new_agent_id_tuple_value = golem_wasm_rpc::Value::from(new_agent_id);
-
-                        let new_agent_id = match new_agent_id_tuple_value {
-                            golem_wasm_rpc::Value::Tuple(values) => {
-                                let agent = values[0].clone();
-
-                                match agent {
-                                    golem_wasm_rpc::Value::String(agent_id) => agent_id.to_string(),
-                                    _ => {
-                                        panic!("Expected agent_id to be a String, but got: {:?}", agent);
-                                    }
-                                }
-                            }
-
-                            _ => {
-                                panic!("Expected get-agent-id to return a tuple, but got: {:?}", new_agent_id_tuple_value);
-                            }
-                        };
 
                         let worker_name = match handle.clone() {
                             golem_wasm_rpc::Value::Handle {uri, ..} => {
@@ -179,7 +164,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                             }
                         };
 
-                        Ok(Self { agent_id: new_agent_id, handle: handle.clone(), worker_id: golem_wasm_rpc::WorkerId { component_id: current_component_id, worker_name: worker_name } })
+                        Ok(Self { handle: handle.clone(), worker_id: golem_wasm_rpc::WorkerId { component_id: current_component_id, worker_name: worker_name } })
                     }
                     _ => {
                         Err(format!("Expected agent_info to be a tuple, but got: {:?}", value))
@@ -253,11 +238,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                    }
                };
 
-                Ok(Self { agent_id: agent_id_cloned, handle: handle, worker_id: worker_id })
-            }
-
-            pub fn get_agent_id(&self) -> String {
-                self.agent_id.clone()
+                Ok(Self { handle: handle, worker_id: worker_id })
             }
 
             pub fn get_container_id(&self) -> golem_wasm_rpc::WorkerId {
@@ -313,19 +294,12 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
             if let syn::TraitItem::Fn(trait_fn) = item {
                 for input in &trait_fn.sig.inputs {
                     if let syn::FnArg::Typed(pat_type) = input {
-                        let ty: &syn::Type = &pat_type.ty;
-                        let wit_type = get_wit_type(ty);
-
-                        match wit_type {
-                            Some(x) => {
-                                parameter_types.push(x);
-                            }
-                            None =>  return syn::Error::new_spanned(
-                                ty,
-                                format!("Unsupported type in agent method: {}", quote::quote!(#ty)), // this should never happen once we extend type-mapping
-                            ).to_compile_error().into()
-
-                        }
+                        let ty = &pat_type.ty;
+                        parameter_types.push(quote! {
+                            ::golem_agentic::bindings::golem::agent::common::ParameterType::Wit(
+                                <#ty as ::golem_agentic::ToWitType>::get_wit_type()
+                            )
+                        });
                     }
                 }
 
@@ -333,45 +307,30 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
                 match &trait_fn.sig.output {
                     syn::ReturnType::Default => (),
                     syn::ReturnType::Type(_, ty) => {
-                        let wit_type = get_wit_type(ty);
-                        match wit_type {
-                            Some(x) => {
-                                result_type.push(x);
-                            }
-                            None => return syn::Error::new_spanned(
-                                ty,
-                                format!("Unsupported return type in agent method: {}", quote::quote!(#ty)), // this should never happen once we extend type-mapping
-                            ).to_compile_error().into()
-                        }
+                        result_type.push(quote! {
+                            ::golem_agentic::bindings::golem::agent::common::ParameterType::Wit(
+                                <#ty as ::golem_agentic::ToWitType>::get_wit_type()
+                            )
+                        });
                     }
                 };
             }
 
-            let input_parameters: Vec<_> = parameter_types.into_iter().map(|ty| {
-                let tokens = wit_type_to_tokens(&ty);
-                quote! {
-                    ::golem_agentic::bindings::golem::agentic::common::ParameterType::Wit(#tokens)
-                }
-            }).collect();
+            let input_parameters = parameter_types;
 
-            let output_parameters: Vec<_> = result_type.into_iter().map(|ty| {
-                let tokens = wit_type_to_tokens(&ty);
 
-                quote! {
-                    ::golem_agentic::bindings::golem::agentic::common::ParameterType::Wit(#tokens)
-                }
-            }).collect();
+            let output_parameters = result_type;
 
 
             Some(quote! {
-                golem_agentic::bindings::golem::agentic::common::AgentMethod {
+                golem_agentic::bindings::golem::agent::common::AgentMethod {
                     name: #method_name.to_string(),
                     description: #description.to_string(),
                     prompt_hint: None,
-                    input_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
+                    input_schema: ::golem_agentic::bindings::golem::agent::common::DataSchema::Structured(::golem_agentic::bindings::golem::agent::common::Structured {
                           parameters: vec![#(#input_parameters),*]
                     }),
-                    output_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
+                    output_schema: ::golem_agentic::bindings::golem::agent::common::DataSchema::Structured(::golem_agentic::bindings::golem::agent::common::Structured {
                       parameters: vec![#(#output_parameters),*]
                     }),
                 }
@@ -382,7 +341,7 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     });
 
     quote! {
-        golem_agentic::bindings::golem::agentic::common::AgentDefinition {
+        golem_agentic::bindings::golem::agent::common::AgentDefinition {
             agent_name: #agent_name.to_string(),
             description: "".to_string(),
             methods: vec![#(#methods),*],
@@ -437,10 +396,10 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
             let extraction = param_idents.iter().enumerate().map(|(i, ident)| {
                 quote! {
-                 let #ident = input
+                 let #ident = ::golem_agentic::FromWitValue::from_wit_value(input
                   .get(#i)
                   .expect("missing argument")
-                  .clone();
+                  .clone()).expect("internal error, failed to convert wit value to expected type");
                 }
             });
 
@@ -450,7 +409,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
                 #method_name => {
                     #(#extraction)*
                     let result: String = self.#ident(#(#param_idents),*);
-                    ::golem_agentic::bindings::exports::golem::agentic_guest::guest::StatusUpdate::Emit(result.to_string())
+                    ::golem_agentic::bindings::exports::golem::agent::guest::StatusUpdate::Emit(result.to_string())
                 }
             });
         }
@@ -465,17 +424,17 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
 
         impl golem_agentic::agent::Agent for #self_ty {
-            fn invoke(&self, method_name: String, input: Vec<String>) -> ::golem_agentic::bindings::golem::agentic::common::StatusUpdate {
+            fn invoke(&self, method_name: String, input: Vec<golem_wasm_rpc::WitValue>) -> ::golem_agentic::bindings::golem::agent::common::StatusUpdate {
                 match method_name.as_str() {
                     #(#match_arms,)*
-                    _ =>  ::golem_agentic::bindings::golem::agentic::common::StatusUpdate::Emit(format!(
+                    _ =>  ::golem_agentic::bindings::golem::agent::common::StatusUpdate::Emit(format!(
                         "Method '{}' not found in agent '{}'",
                         method_name, #trait_name_str
                     )),
                 }
             }
 
-            fn get_definition(&self) -> ::golem_agentic::bindings::golem::agentic::common::AgentDefinition {
+            fn get_definition(&self) -> ::golem_agentic::bindings::golem::agent::common::AgentDefinition {
                 golem_agentic::agent_registry::get_agent_def_by_name(&#trait_name_str)
                     .expect("Agent definition not found")
             }
@@ -502,7 +461,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
                  };
 
                  let agent =
-                     golem_agentic::bindings::exports::golem::agentic_guest::guest::Agent::new(resolved_agent.clone());
+                     golem_agentic::bindings::exports::golem::agent::guest::Agent::new(resolved_agent.clone());
 
                  let handle = agent.handle();
 
@@ -658,124 +617,6 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
-}
-
-fn get_wit_type(ty: &syn::Type) -> Option<WitType> {
-    let analysed_type = if let syn::Type::Path(type_path) = ty {
-        let ident = type_path.path.segments.last().unwrap().ident.to_string();
-
-        match ident.as_str() {
-            "String" => Some(str()),
-            "bool" => Some(bool()),
-            "u64" => Some(u64()),
-            "i64" => Some(s64()),
-            "f64" => Some(f64()),
-            _ => None, // TODO; complete the rest
-        }
-    } else {
-        None
-    }?;
-
-    Some(WitType::from(analysed_type))
-}
-
-fn wit_type_node_to_tokens(node: &WitTypeNode) -> proc_macro2::TokenStream {
-    match node {
-        WitTypeNode::RecordType(fields) => {
-            let fields_tokens = fields.iter().map(|(name, idx)| {
-                let name = name;
-                let idx = *idx;
-                quote! { (#name.to_string(), #idx) }
-            });
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::RecordType(vec![#(#fields_tokens),*])
-            }
-        }
-        WitTypeNode::VariantType(variants) => {
-            let variants_tokens = variants.iter().map(|(name, opt_idx)| {
-                let name = name;
-                match opt_idx {
-                    Some(idx) => quote! { (#name.to_string(), Some(#idx)) },
-                    None => quote! { (#name.to_string(), None) },
-                }
-            });
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::VariantType(vec![#(#variants_tokens),*])
-            }
-        }
-        WitTypeNode::EnumType(variants) => {
-            let variants_tokens = variants.iter().map(|v| quote! { #v.to_string() });
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::EnumType(vec![#(#variants_tokens),*])
-            }
-        }
-        WitTypeNode::FlagsType(flags) => {
-            let flags_tokens = flags.iter().map(|f| quote! { #f.to_string() });
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::FlagsType(vec![#(#flags_tokens),*])
-            }
-        }
-        WitTypeNode::TupleType(indices) => {
-            let indices_tokens = indices.iter().copied();
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::TupleType(vec![#(#indices_tokens),*])
-            }
-        }
-        WitTypeNode::ListType(idx) => {
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::ListType(#idx)
-            }
-        }
-        WitTypeNode::OptionType(idx) => {
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::OptionType(#idx)
-            }
-        }
-        WitTypeNode::ResultType((ok, err)) => {
-            let ok_tokens = match ok {
-                Some(idx) => quote! { Some(#idx) },
-                None => quote! { None },
-            };
-            let err_tokens = match err {
-                Some(idx) => quote! { Some(#idx) },
-                None => quote! { None },
-            };
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::ResultType((#ok_tokens, #err_tokens))
-            }
-        }
-        WitTypeNode::PrimU8Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimU8Type },
-        WitTypeNode::PrimU16Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimU16Type },
-        WitTypeNode::PrimU32Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimU32Type },
-        WitTypeNode::PrimU64Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimU64Type },
-        WitTypeNode::PrimS8Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimS8Type },
-        WitTypeNode::PrimS16Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimS16Type },
-        WitTypeNode::PrimS32Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimS32Type },
-        WitTypeNode::PrimS64Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimS64Type },
-        WitTypeNode::PrimF32Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimF32Type },
-        WitTypeNode::PrimF64Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimF64Type },
-        WitTypeNode::PrimCharType => quote! { ::golem_wasm_rpc::WitTypeNode::PrimCharType },
-        WitTypeNode::PrimBoolType => quote! { ::golem_wasm_rpc::WitTypeNode::PrimBoolType },
-        WitTypeNode::PrimStringType => quote! { ::golem_wasm_rpc::WitTypeNode::PrimStringType },
-        WitTypeNode::HandleType((res_id, res_mode)) => {
-            let res_mode_tokens = match res_mode {
-                ResourceMode::Owned => quote! { ::golem_wasm_rpc::ResourceMode::Owned },
-                ResourceMode::Borrowed => quote! { ::golem_wasm_rpc::ResourceMode::Borrowed },
-            };
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::HandleType((#res_id, #res_mode_tokens))
-            }
-        }
-    }
-}
-
-fn wit_type_to_tokens(ty: &WitType) -> proc_macro2::TokenStream {
-    let nodes_tokens = ty.nodes.iter().map(wit_type_node_to_tokens);
-    quote! {
-        ::golem_wasm_rpc::WitType {
-            nodes: vec![#(#nodes_tokens),*]
-        }
-    }
 }
 
 fn to_kebab_case(s: &str) -> String {

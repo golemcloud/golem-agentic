@@ -1,6 +1,5 @@
-use crate::agent::Agent;
 use crate::agent_instance_registry::AgentName;
-use crate::bindings::exports::golem::agentic_guest::guest::{AgentDefinition, AgentRef};
+use crate::bindings::exports::golem::agent::guest::{AgentDefinition, AgentRef};
 use crate::ResolvedAgent;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -12,7 +11,7 @@ type AgentTraitName = String;
 pub struct AgentId(pub String);
 
 pub struct AgentRefInternal {
-    inner_instance: crate::bindings::exports::golem::agentic_guest::guest::Agent,
+    inner_instance: crate::bindings::exports::golem::agent::guest::Agent,
     resolved_agent: ResolvedAgent,
     agent_name: String,
 }
@@ -51,7 +50,7 @@ pub fn register_agent_initiator(
 // This is not great, but I wanted to test
 pub fn get_agent_instances_by_prefix(
     prefix: &str,
-) -> Vec<crate::bindings::exports::golem::agentic_guest::guest::AgentRef> {
+) -> Vec<crate::bindings::exports::golem::agent::guest::AgentRef> {
     AGENT_INSTANCE_REGISTRY
         .lock()
         .unwrap()
@@ -73,7 +72,7 @@ pub fn get_agent_instances_by_prefix(
 pub fn register_agent_instance(
     agent_id: AgentId,
     agent_name: String,
-    agent_instance: crate::bindings::exports::golem::agentic_guest::guest::Agent,
+    agent_instance: crate::bindings::exports::golem::agent::guest::Agent,
     resolved_agent: ResolvedAgent,
 ) {
     AGENT_INSTANCE_REGISTRY.lock().unwrap().insert(

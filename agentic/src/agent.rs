@@ -1,4 +1,5 @@
-use crate::bindings::exports::golem::agentic_guest::guest::{AgentDefinition, StatusUpdate};
+use crate::bindings::exports::golem::agent::guest::{AgentDefinition, StatusUpdate};
+use golem_wasm_rpc::WitValue;
 
 // A simple Agent that every agent abstraction has to extend
 // This is auto implemented when using `agent_implementation` attribute.
@@ -23,7 +24,8 @@ use crate::bindings::exports::golem::agentic_guest::guest::{AgentDefinition, Sta
 //  ```
 // There is no need to implement `Agent` anywhere, as it is automatically implemented by the `[agent_implementation]` attribute.
 pub trait Agent: Send + Sync {
-    fn invoke(&self, method_name: String, input: Vec<String>) -> StatusUpdate;
+    // During implementation it should be possible to use DataValue for multi modal types
+    fn invoke(&self, method_name: String, input: Vec<WitValue>) -> StatusUpdate;
     fn get_definition(&self) -> AgentDefinition;
 }
 
