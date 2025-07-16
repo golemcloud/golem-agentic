@@ -1,7 +1,29 @@
 use golem_wasm_ast::analysis::analysed_type::{str, u32, u64};
 use golem_wasm_ast::analysis::AnalysedType;
 use golem_wasm_rpc::{NodeBuilder, WitValue};
-use golem_wasm_rpc::{Value, WitType, WitValueBuilderExtensions};
+use golem_wasm_rpc::{Value, WitType};
+
+pub trait AgentArg: ToValue + FromWitValue + ToWitType {
+    fn to_value(&self) -> golem_wasm_rpc::Value {
+        ToValue::to_value(self)
+    }
+
+    fn from_wit_value(value: WitValue) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        FromWitValue::from_wit_value(value)
+    }
+
+    fn get_wit_type() -> WitType
+    where
+        Self: Sized,
+    {
+        <Self as ToWitType>::get_wit_type()
+    }
+}
+
+impl<T: ToValue + FromWitValue + ToWitType> AgentArg for T {}
 
 pub trait ToValue {
     fn to_value(&self) -> golem_wasm_rpc::Value;
@@ -46,31 +68,41 @@ impl FromValue for String {
     }
 }
 
+impl FromValue for u32 {
+    fn from_value(value: golem_wasm_rpc::Value) -> Result<Self, String> {
+        match value {
+            golem_wasm_rpc::Value::U32(n) => Ok(n),
+            _ => Err("Expected a u32 value".to_string()),
+        }
+    }
+}
+
+impl FromValue for bool {
+    fn from_value(value: golem_wasm_rpc::Value) -> Result<Self, String> {
+        match value {
+            golem_wasm_rpc::Value::Bool(b) => Ok(b),
+            _ => Err("Expected a bool value".to_string()),
+        }
+    }
+}
+
+impl FromValue for u64 {
+    fn from_value(value: golem_wasm_rpc::Value) -> Result<Self, String> {
+        match value {
+            golem_wasm_rpc::Value::U64(n) => Ok(n),
+            _ => Err("Expected a u64 value".to_string()),
+        }
+    }
+}
+
 pub trait ToWitValue {
     fn to_wit_value(&self) -> golem_wasm_rpc::WitValue;
 }
 
-impl ToWitValue for String {
+impl<T: ToValue> ToWitValue for T {
     fn to_wit_value(&self) -> WitValue {
-        WitValue::builder().string(self)
-    }
-}
-
-impl ToWitValue for u32 {
-    fn to_wit_value(&self) -> WitValue {
-        WitValue::builder().u32(*self)
-    }
-}
-
-impl ToWitValue for bool {
-    fn to_wit_value(&self) -> WitValue {
-        WitValue::builder().bool(*self)
-    }
-}
-
-impl ToWitValue for u64 {
-    fn to_wit_value(&self) -> WitValue {
-        WitValue::builder().u64(*self)
+        let value = self.to_value();
+        WitValue::from(value)
     }
 }
 
