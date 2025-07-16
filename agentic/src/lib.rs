@@ -23,7 +23,7 @@ struct Component;
 impl Guest for Component {
     type Agent = ResolvedAgent;
 
-    fn discover_agent_definitions() -> Vec<AgentType> {
+    fn discover_agent_types() -> Vec<AgentType> {
         agent_registry::get_all_agent_definitions()
     }
 

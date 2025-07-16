@@ -13,14 +13,14 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let fn_suffix = &tr_name.to_string().to_lowercase();
     let fn_name = format_ident!("register_agent_definition_{}", fn_suffix); // may be ctor is not required. But works now
 
-    let agent_definition = get_agent_definition(&tr);
+    let agent_type = get_agent_type(&tr);
 
     let register_fn = quote! {
         #[::ctor::ctor]
         fn #fn_name() {
             golem_agentic::agent_registry::register_agent_definition(
                #tr_name_str_kebab.to_string(),
-                #agent_definition
+                #agent_type
             );
         }
     };
@@ -139,8 +139,8 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
             pub fn new() -> Result<Self, String> {
                 let current_component_id = ::golem_agentic::bindings::golem::api::host::get_self_metadata().worker_id.component_id;
                 let rpc = golem_wasm_rpc::WasmRpc::ephemeral(current_component_id.clone());
-                let agent_name = golem_wasm_rpc::Value::String(#agent_definition.agent_name.to_string());
-                let agent_name_wit_value = &[golem_wasm_rpc::WitValue::from(agent_name.clone())];
+                let type_name = golem_wasm_rpc::Value::String(#agent_type.type_name.to_string());
+                let type_name_wit_value = &[golem_wasm_rpc::WitValue::from(type_name.clone())];
 
                 let agent_handle_in_vec = rpc.invoke_and_await(
                     "golem:simulated-agentic/simulated-agent.{weather-agent.new}",
@@ -206,7 +206,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                      match agent_id {
                        golem_wasm_rpc::Value::Record(values) => {
                            let agent_id =  values[0].clone();
-                           let agent_name = values[1].clone();
+                           let type_name = values[1].clone();
                            let handle = values[2].clone();
                            let u32 = match handle {
                                golem_wasm_rpc::Value::U32(id) => id as u64,
@@ -258,8 +258,8 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     result.into()
 }
 
-fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
-    let agent_name = to_kebab_case(&tr.ident.to_string());
+fn get_agent_type(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
+    let type_name = to_kebab_case(&tr.ident.to_string());
 
     let methods = tr.items.iter().filter_map(|item| {
         if let syn::TraitItem::Fn(trait_fn) = item {
@@ -342,7 +342,7 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
 
     quote! {
         golem_agentic::bindings::golem::agent::common::AgentType {
-            type_name: #agent_name.to_string(),
+            type_name: #type_name.to_string(),
             description: "".to_string(),
             methods: vec![#(#methods),*],
             requires: vec![]
@@ -560,7 +560,7 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
         }
 
         let mut custom_agent_id = None;
-        let mut custom_agent_name = None;
+        let mut custom_type_name = None;
 
         for attr in &field.attrs {
             match &attr.meta {
@@ -571,10 +571,10 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
                         }
                     }
                 }
-                Meta::NameValue(nv) if nv.path.is_ident("agent_name") => {
+                Meta::NameValue(nv) if nv.path.is_ident("type_name") => {
                     if let syn::Expr::Lit(expr_lit) = &nv.value {
                         if let syn::Lit::Str(litstr) = &expr_lit.lit {
-                            custom_agent_name = Some(litstr.value());
+                            custom_type_name = Some(litstr.value());
                         }
                     }
                 }
@@ -587,17 +587,17 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
             .map(|s| syn::parse_str::<syn::Expr>(&s).unwrap())
             .unwrap_or_else(|| syn::parse_quote! { agent_id.clone() }); // TODO; it's always a remote agent.
 
-        let agent_name_expr = custom_agent_name
+        let type_name_expr = custom_type_name
             .as_ref()
             .map(|s| syn::parse_str::<syn::Expr>(&s).unwrap())
-            .unwrap_or_else(|| syn::parse_quote! { agent_name.clone() }); // TODO; agent_name expr should be option so that it can piggyback on local calls
+            .unwrap_or_else(|| syn::parse_quote! { type_name.clone() }); // TODO; type_name expr should be option so that it can piggyback on local calls
 
         extra_let_bindings.push(quote! {
             // I think this is wrong. the constructor is making use of same agent id and agent name.
             // I think probably one way to distinguish between local and remote agents is - whether or not
             // the given field has an agent-id and agent-name. Any local dependencies shouldn't need these fields
             // that will be the way to distinguish between local and remote agents
-           let #field_ident: #field_ty = #field_ty::new(#agent_id_expr, #agent_name_expr);
+           let #field_ident: #field_ty = #field_ty::new(#agent_id_expr, #type_name_expr);
         });
 
         extra_struct_fields.push(quote! { #field_ident });
@@ -605,11 +605,11 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl #impl_generics #struct_ident #ty_generics #where_clause {
-            pub fn new(agent_id: String, agent_name: String) -> Self {
+            pub fn new(agent_id: String, type_name: String) -> Self {
                 #(#extra_let_bindings)*
                 Self {
                     agent_id,
-                    agent_name,
+                    type_name,
                     #(#extra_struct_fields),*
                 }
             }

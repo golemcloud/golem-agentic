@@ -30,6 +30,6 @@ interface guest {
 
     discover-agents: func() -> list<agent-ref>;
 
-    discover-agent-definitions: func() -> list<agent-type>;
+    discover-agent-types: func() -> list<agent-type>;
 }
 
