@@ -1,0 +1,17 @@
+[package]
+name = "agent-definition-extractor-prototype"
+version = "0.0.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[[bin]]
+name = "agent-definition-extractor-prototype"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.98"
+golem-common = "1.3.0-dev.17"
+golem-rib = "1.3.0-dev.17"
+tokio = { version = "1.46.1", features = ["full"] }
+wasmtime = { version = "33.0.0", features = ["async", "component-model"] }
+wasmtime-wasi = { version = "33.0.0" }
