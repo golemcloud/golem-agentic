@@ -1,5 +1,5 @@
 use crate::agent_instance_registry::AgentName;
-use crate::bindings::exports::golem::agent::guest::{AgentDefinition, AgentRef};
+use crate::bindings::exports::golem::agent::guest::{AgentRef, AgentType};
 use crate::ResolvedAgent;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -16,7 +16,7 @@ pub struct AgentRefInternal {
     agent_name: String,
 }
 
-static AGENT_DEF_REGISTRY: Lazy<Mutex<HashMap<AgentTraitName, AgentDefinition>>> =
+static AGENT_DEF_REGISTRY: Lazy<Mutex<HashMap<AgentTraitName, AgentType>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 // Given an agent name, we can register an impl of agent-initiator
@@ -29,7 +29,7 @@ static AGENT_INITIATOR_REGISTRY: Lazy<
 static AGENT_INSTANCE_REGISTRY: Lazy<Mutex<HashMap<AgentId, AgentRefInternal>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-pub fn register_agent_definition(agent_trait_name: String, def: AgentDefinition) {
+pub fn register_agent_definition(agent_trait_name: String, def: AgentType) {
     AGENT_DEF_REGISTRY
         .lock()
         .unwrap()
@@ -97,7 +97,7 @@ pub fn get_agent_instance(agent_id: AgentId) -> Option<AgentRef> {
         })
 }
 
-pub fn get_agent_def_by_name(agent_trait_name: &str) -> Option<AgentDefinition> {
+pub fn get_agent_def_by_name(agent_trait_name: &str) -> Option<AgentType> {
     AGENT_DEF_REGISTRY
         .lock()
         .unwrap()
@@ -105,7 +105,7 @@ pub fn get_agent_def_by_name(agent_trait_name: &str) -> Option<AgentDefinition> 
         .cloned()
 }
 
-pub fn get_all_agent_definitions() -> Vec<AgentDefinition> {
+pub fn get_all_agent_definitions() -> Vec<AgentType> {
     AGENT_DEF_REGISTRY
         .lock()
         .unwrap()

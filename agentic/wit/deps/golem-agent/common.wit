@@ -3,8 +3,8 @@ package golem:agent;
 interface common {
     use golem:rpc/types@0.2.1.{wit-type};
 
-    record agent-definition {
-        agent-name:  string,
+    record agent-type {
+        type-name:  string,
         description: string,
         methods:     list<agent-method>,
         requires:    list<agent-dependency>,
@@ -75,39 +75,3 @@ interface common {
         network-error,
     }
 }
-
-interface guest {
-    use common.{status-update, agent-definition};
-    use golem:rpc/types@0.2.1.{wit-value};
-
-    // This is not quite right, we really need a host function that keeps track
-    // of the resources constructed explicitly within the component using a host
-    // function and will be done during the time of implementation
-    record agent-ref {
-        agent-id: string,
-        agent-name: string,
-        agent-handle: u32,
-    }
-
-    resource agent {
-        constructor(agent-name: string);
-
-        get-id: func() -> string;
-
-        // In the future, it will be possible
-        // in the future, this will be result
-        invoke: func(method-name: string, input: list<wit-value>) -> status-update;
-
-        get-definition: func() -> agent-definition;
-
-        /// export-state: func() -> result<wit-value, error>;
-        /// import-state: func(wit-value) -> result<_, error>;
-    }
-
-    get-agent: func(agent-id: string) -> agent-ref;
-
-    discover-agents: func() -> list<agent-ref>;
-
-    discover-agent-definitions: func() -> list<agent-definition>;
-}
-

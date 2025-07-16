@@ -1,6 +1,6 @@
 use crate::agent_registry::AgentId;
-use crate::bindings::exports::golem::agent::guest::{AgentDefinition, Guest, GuestAgent};
 use crate::bindings::exports::golem::agent::guest::{AgentRef, StatusUpdate};
+use crate::bindings::exports::golem::agent::guest::{AgentType, Guest, GuestAgent};
 use crate::bindings::golem::api::host;
 use golem_wasm_rpc::WitValue;
 
@@ -23,7 +23,7 @@ struct Component;
 impl Guest for Component {
     type Agent = ResolvedAgent;
 
-    fn discover_agent_definitions() -> Vec<AgentDefinition> {
+    fn discover_agent_types() -> Vec<AgentType> {
         agent_registry::get_all_agent_definitions()
     }
 
@@ -49,7 +49,7 @@ impl Guest for Component {
     fn discover_agents() -> Vec<AgentRef> {
         let agent_names = agent_registry::get_all_agent_definitions()
             .iter()
-            .map(|x| x.agent_name.clone())
+            .map(|x| x.type_name.clone())
             .collect::<Vec<_>>();
 
         let worker_name = host::get_self_metadata().worker_id.worker_name.clone();
@@ -71,16 +71,26 @@ impl Guest for Component {
 }
 
 impl GuestAgent for ResolvedAgent {
-    fn new(agent_name: String) -> ResolvedAgent {
-        let agent_definitions = agent_registry::get_all_agent_definitions();
+    fn new(agent_type: String) -> ResolvedAgent {
+        let agent_types = agent_registry::get_all_agent_definitions();
 
-        let agent_definition = agent_definitions.iter().find(|x| x.agent_name == agent_name).expect(
-            format!("Agent definition not found for agent name: {}. Available agents in this app is {}", agent_name,
-                    agent_definitions.iter().map(|x| x.agent_name.clone()).collect::<Vec<_>>().join(", ")).as_str()
+        let agent_type = agent_types
+            .iter()
+            .find(|x| x.type_name == agent_type)
+            .expect(
+            format!(
+                "Agent definition not found for agent name: {}. Available agents in this app is {}",
+                agent_type,
+                agent_types
+                    .iter()
+                    .map(|x| x.type_name.clone())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+            .as_str(),
         );
 
-        let agent_initiator =
-            agent_registry::get_agent_initiator(agent_definition.agent_name.clone());
+        let agent_initiator = agent_registry::get_agent_initiator(agent_type.type_name.clone());
 
         if let Some(agent) = agent_initiator {
             let agent = agent.initiate();
@@ -88,7 +98,7 @@ impl GuestAgent for ResolvedAgent {
         } else {
             panic!(
                 "No agent implementation found for agent definition: {}",
-                agent_definition.agent_name
+                agent_type.type_name
             );
         }
     }
@@ -101,7 +111,7 @@ impl GuestAgent for ResolvedAgent {
         self.agent.invoke(method_name, input)
     }
 
-    fn get_definition(&self) -> AgentDefinition {
+    fn get_definition(&self) -> AgentType {
         self.agent.get_definition()
     }
 }

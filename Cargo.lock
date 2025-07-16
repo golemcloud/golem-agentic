@@ -1732,25 +1732,12 @@ name = "golem-wasm-ast"
 version = "0.0.0"
 source = "git+https://github.com/golemcloud/golem.git?branch=code_first_agent#001c907f4b0609c5ea929f553bed1e22a534acd9"
 dependencies = [
- "bincode",
- "bincode_derive",
  "itertools 0.14.0",
- "leb128",
  "mappable-rc",
- "poem-openapi",
- "poem-openapi-derive",
- "prost",
- "prost-build",
  "semver",
  "serde",
  "serde_json",
- "time",
- "wasm-encoder 0.227.1",
  "wasm-metadata 0.227.1",
- "wasm-wave",
- "wasmparser 0.227.1",
- "wit-component 0.229.0",
- "wit-parser 0.229.0",
 ]
 
 [[package]]
