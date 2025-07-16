@@ -1,5 +1,5 @@
-use golem_wasm_rpc::WitValue;
 use crate::bindings::exports::golem::agent::guest::{AgentDefinition, StatusUpdate};
+use golem_wasm_rpc::WitValue;
 
 // A simple Agent that every agent abstraction has to extend
 // This is auto implemented when using `agent_implementation` attribute.

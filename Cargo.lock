@@ -398,6 +398,7 @@ dependencies = [
 [[package]]
 name = "golem-wasm-ast"
 version = "0.0.0"
+source = "git+https://github.com/golemcloud/golem.git?branch=code_first_agent#001c907f4b0609c5ea929f553bed1e22a534acd9"
 dependencies = [
  "itertools",
  "mappable-rc",
@@ -410,6 +411,7 @@ dependencies = [
 [[package]]
 name = "golem-wasm-rpc"
 version = "0.0.0"
+source = "git+https://github.com/golemcloud/golem.git?branch=code_first_agent#001c907f4b0609c5ea929f553bed1e22a534acd9"
 dependencies = [
  "cargo_metadata",
  "chrono",

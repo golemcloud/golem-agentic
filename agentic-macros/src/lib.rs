@@ -1,12 +1,7 @@
 extern crate proc_macro;
-use golem_wasm_ast::analysis::analysed_type::*;
-use golem_wasm_rpc::{ResourceMode, WitTypeNode};
+
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-
-use golem_agentic::bindings::golem::agent::common::WitType;
-#[allow(unused_imports)]
-use lazy_static::lazy_static;
 use syn::{parse_macro_input, Data, DeriveInput, Fields, Meta};
 
 #[proc_macro_attribute]
@@ -299,19 +294,12 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
             if let syn::TraitItem::Fn(trait_fn) = item {
                 for input in &trait_fn.sig.inputs {
                     if let syn::FnArg::Typed(pat_type) = input {
-                        let ty: &syn::Type = &pat_type.ty;
-                        let wit_type = get_wit_type(ty);
-
-                        match wit_type {
-                            Some(x) => {
-                                parameter_types.push(x);
-                            }
-                            None =>  return syn::Error::new_spanned(
-                                ty,
-                                format!("Unsupported type in agent method: {}", quote::quote!(#ty)), // this should never happen once we extend type-mapping
-                            ).to_compile_error().into()
-
-                        }
+                        let ty = &pat_type.ty;
+                        parameter_types.push(quote! {
+                            ::golem_agentic::bindings::golem::agent::common::ParameterType::Wit(
+                                <#ty as ::golem_agentic::ToWitType>::get_wit_type()
+                            )
+                        });
                     }
                 }
 
@@ -319,34 +307,19 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
                 match &trait_fn.sig.output {
                     syn::ReturnType::Default => (),
                     syn::ReturnType::Type(_, ty) => {
-                        let wit_type = get_wit_type(ty);
-                        match wit_type {
-                            Some(x) => {
-                                result_type.push(x);
-                            }
-                            None => return syn::Error::new_spanned(
-                                ty,
-                                format!("Unsupported return type in agent method: {}", quote::quote!(#ty)), // this should never happen once we extend type-mapping
-                            ).to_compile_error().into()
-                        }
+                        result_type.push(quote! {
+                            ::golem_agentic::bindings::golem::agent::common::ParameterType::Wit(
+                                <#ty as ::golem_agentic::ToWitType>::get_wit_type()
+                            )
+                        });
                     }
                 };
             }
 
-            let input_parameters: Vec<_> = parameter_types.into_iter().map(|ty| {
-                let tokens = wit_type_to_tokens(&ty);
-                quote! {
-                    ::golem_agentic::bindings::golem::agent::common::ParameterType::Wit(#tokens)
-                }
-            }).collect();
+            let input_parameters = parameter_types;
 
-            let output_parameters: Vec<_> = result_type.into_iter().map(|ty| {
-                let tokens = wit_type_to_tokens(&ty);
 
-                quote! {
-                    ::golem_agentic::bindings::golem::agent::common::ParameterType::Wit(#tokens)
-                }
-            }).collect();
+            let output_parameters = result_type;
 
 
             Some(quote! {
@@ -644,124 +617,6 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
-}
-
-fn get_wit_type(ty: &syn::Type) -> Option<WitType> {
-    let analysed_type = if let syn::Type::Path(type_path) = ty {
-        let ident = type_path.path.segments.last().unwrap().ident.to_string();
-
-        match ident.as_str() {
-            "String" => Some(str()),
-            "bool" => Some(bool()),
-            "u64" => Some(u64()),
-            "i64" => Some(s64()),
-            "f64" => Some(f64()),
-            _ => None, // TODO; complete the rest
-        }
-    } else {
-        None
-    }?;
-
-    Some(WitType::from(analysed_type))
-}
-
-fn wit_type_node_to_tokens(node: &WitTypeNode) -> proc_macro2::TokenStream {
-    match node {
-        WitTypeNode::RecordType(fields) => {
-            let fields_tokens = fields.iter().map(|(name, idx)| {
-                let name = name;
-                let idx = *idx;
-                quote! { (#name.to_string(), #idx) }
-            });
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::RecordType(vec![#(#fields_tokens),*])
-            }
-        }
-        WitTypeNode::VariantType(variants) => {
-            let variants_tokens = variants.iter().map(|(name, opt_idx)| {
-                let name = name;
-                match opt_idx {
-                    Some(idx) => quote! { (#name.to_string(), Some(#idx)) },
-                    None => quote! { (#name.to_string(), None) },
-                }
-            });
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::VariantType(vec![#(#variants_tokens),*])
-            }
-        }
-        WitTypeNode::EnumType(variants) => {
-            let variants_tokens = variants.iter().map(|v| quote! { #v.to_string() });
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::EnumType(vec![#(#variants_tokens),*])
-            }
-        }
-        WitTypeNode::FlagsType(flags) => {
-            let flags_tokens = flags.iter().map(|f| quote! { #f.to_string() });
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::FlagsType(vec![#(#flags_tokens),*])
-            }
-        }
-        WitTypeNode::TupleType(indices) => {
-            let indices_tokens = indices.iter().copied();
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::TupleType(vec![#(#indices_tokens),*])
-            }
-        }
-        WitTypeNode::ListType(idx) => {
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::ListType(#idx)
-            }
-        }
-        WitTypeNode::OptionType(idx) => {
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::OptionType(#idx)
-            }
-        }
-        WitTypeNode::ResultType((ok, err)) => {
-            let ok_tokens = match ok {
-                Some(idx) => quote! { Some(#idx) },
-                None => quote! { None },
-            };
-            let err_tokens = match err {
-                Some(idx) => quote! { Some(#idx) },
-                None => quote! { None },
-            };
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::ResultType((#ok_tokens, #err_tokens))
-            }
-        }
-        WitTypeNode::PrimU8Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimU8Type },
-        WitTypeNode::PrimU16Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimU16Type },
-        WitTypeNode::PrimU32Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimU32Type },
-        WitTypeNode::PrimU64Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimU64Type },
-        WitTypeNode::PrimS8Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimS8Type },
-        WitTypeNode::PrimS16Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimS16Type },
-        WitTypeNode::PrimS32Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimS32Type },
-        WitTypeNode::PrimS64Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimS64Type },
-        WitTypeNode::PrimF32Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimF32Type },
-        WitTypeNode::PrimF64Type => quote! { ::golem_wasm_rpc::WitTypeNode::PrimF64Type },
-        WitTypeNode::PrimCharType => quote! { ::golem_wasm_rpc::WitTypeNode::PrimCharType },
-        WitTypeNode::PrimBoolType => quote! { ::golem_wasm_rpc::WitTypeNode::PrimBoolType },
-        WitTypeNode::PrimStringType => quote! { ::golem_wasm_rpc::WitTypeNode::PrimStringType },
-        WitTypeNode::HandleType((res_id, res_mode)) => {
-            let res_mode_tokens = match res_mode {
-                ResourceMode::Owned => quote! { ::golem_wasm_rpc::ResourceMode::Owned },
-                ResourceMode::Borrowed => quote! { ::golem_wasm_rpc::ResourceMode::Borrowed },
-            };
-            quote! {
-                ::golem_wasm_rpc::WitTypeNode::HandleType((#res_id, #res_mode_tokens))
-            }
-        }
-    }
-}
-
-fn wit_type_to_tokens(ty: &WitType) -> proc_macro2::TokenStream {
-    let nodes_tokens = ty.nodes.iter().map(wit_type_node_to_tokens);
-    quote! {
-        ::golem_wasm_rpc::WitType {
-            nodes: vec![#(#nodes_tokens),*]
-        }
-    }
 }
 
 fn to_kebab_case(s: &str) -> String {

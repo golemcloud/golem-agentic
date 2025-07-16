@@ -1,6 +1,5 @@
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::sync::Mutex;
 
 pub type AgentName = String;

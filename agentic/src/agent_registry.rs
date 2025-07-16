@@ -1,4 +1,3 @@
-use crate::agent::Agent;
 use crate::agent_instance_registry::AgentName;
 use crate::bindings::exports::golem::agent::guest::{AgentDefinition, AgentRef};
 use crate::ResolvedAgent;

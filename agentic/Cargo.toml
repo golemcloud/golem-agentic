@@ -11,10 +11,11 @@ path = "src/lib.rs"
 crate-type = ["rlib"]
 
 [dependencies]
-golem-wasm-rpc = { path =  "../../golem/wasm-rpc",  default-features = false, features = [
-    "stub",
+golem-wasm-rpc = { git =  "https://github.com/golemcloud/golem.git", branch = "code_first_agent",  default-features = false, features = [
+    "stub", "typeinfo"
 ] }
-golem-wasm-ast = {   path =  "../../golem/wasm-ast", default-features = false, features = ["analysis", "json"] }
+golem-wasm-ast = {   git =  "https://github.com/golemcloud/golem.git", branch = "code_first_agent", default-features = false, features = ["analysis", "json"] }
+
 log = { workspace = true }
 mime = "0.3.17"
 nom = { version = "7.1", default-features = false }
