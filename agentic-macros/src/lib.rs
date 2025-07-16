@@ -65,7 +65,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                 .collect();
 
             let input_vec_wit = quote! {
-                vec![#(golem_agentic::ToValue::to_value(&#input_idents)),*]
+                vec![#(golem_agentic::AgentArg::to_value(&#input_idents)),*]
             };
 
             let return_type = match &method.sig.output {
@@ -297,7 +297,7 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
                         let ty = &pat_type.ty;
                         parameter_types.push(quote! {
                             ::golem_agentic::bindings::golem::agent::common::ParameterType::Wit(
-                                <#ty as ::golem_agentic::ToWitType>::get_wit_type()
+                                <#ty as ::golem_agentic::AgentArg>::get_wit_type()
                             )
                         });
                     }
@@ -309,7 +309,7 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
                     syn::ReturnType::Type(_, ty) => {
                         result_type.push(quote! {
                             ::golem_agentic::bindings::golem::agent::common::ParameterType::Wit(
-                                <#ty as ::golem_agentic::ToWitType>::get_wit_type()
+                                <#ty as ::golem_agentic::AgentArg>::get_wit_type()
                             )
                         });
                     }
@@ -396,7 +396,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
 
             let extraction = param_idents.iter().enumerate().map(|(i, ident)| {
                 quote! {
-                 let #ident = ::golem_agentic::FromWitValue::from_wit_value(input
+                 let #ident = ::golem_agentic::AgentArg::from_wit_value(input
                   .get(#i)
                   .expect("missing argument")
                   .clone()).expect("internal error, failed to convert wit value to expected type");
@@ -614,6 +614,106 @@ pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
                 }
             }
         }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_derive(AgentArg)]
+pub fn derive_agent_arg(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let struct_name = &input.ident;
+
+    let fields = match &input.data {
+        Data::Struct(data_struct) => match &data_struct.fields {
+            Fields::Named(named_fields) => &named_fields.named,
+            _ => panic!("AgentArg can only be derived for structs with named fields"),
+        },
+        _ => panic!("AgentArg can only be derived for structs"),
+    };
+
+    let field_idents_vec: Vec<proc_macro2::Ident> = fields
+        .iter()
+        .map(|f| f.ident.as_ref().unwrap().clone())
+        .collect();
+
+    let field_names: Vec<String> = field_idents_vec
+        .iter()
+        .map(|ident| ident.to_string())
+        .collect();
+    let field_types: Vec<_> = fields.iter().map(|f| &f.ty).collect();
+
+    let to_value_fields: Vec<_> = field_idents_vec
+        .iter()
+        .map(|f| {
+            quote! {
+                golem_agentic::AgentArg::to_value(&self.#f)
+            }
+        })
+        .collect();
+
+    let wit_type_fields: Vec<_> = field_idents_vec.iter().zip(field_types.iter()).map(|(ident, ty)| {
+        let name = ident.to_string();
+        quote! {
+            golem_wasm_ast::analysis::NameTypePair {
+                name: #name.to_string(),
+                typ: golem_wasm_ast::analysis::AnalysedType::from(<#ty as golem_agentic::ToWitType>::get_wit_type()),
+            }
+        }
+    }).collect();
+
+    let from_value_fields: Vec<_> = field_idents_vec
+        .iter()
+        .enumerate()
+        .map(|(i, ident)| {
+            let field_name = &field_names[i];
+            let idx = syn::Index::from(i);
+            quote! {
+                let #ident = golem_agentic::FromValue::from_value(values[#idx].clone())
+                    .map_err(|_| format!("Failed to parse field '{}'", #field_name))?;
+            }
+        })
+        .collect();
+
+    let field_count = field_idents_vec.len();
+
+    let expanded = quote! {
+     impl golem_agentic::ToWitType for #struct_name {
+         fn get_wit_type() -> golem_wasm_rpc::WitType {
+             let analysed_type = golem_wasm_ast::analysis::analysed_type::record(vec![
+                 #(#wit_type_fields),*
+             ]);
+             golem_wasm_rpc::WitType::from(analysed_type)
+         }
+     }
+
+     impl golem_agentic::ToValue for #struct_name {
+         fn to_value(&self) -> golem_wasm_rpc::Value {
+             golem_wasm_rpc::Value::Record(vec![
+                 #(#to_value_fields),*
+             ])
+         }
+     }
+
+     impl golem_agentic::FromWitValue for #struct_name {
+         fn from_wit_value(value: golem_wasm_rpc::WitValue) -> Result<Self, String> {
+             let value = golem_wasm_rpc::Value::from(value);
+             match value {
+                 golem_wasm_rpc::Value::Record(values) => {
+                     if values.len() != #field_count {
+                         return Err(format!("Expected {} fields", #field_count));
+                     }
+
+                     #(#from_value_fields)*
+
+                     Ok(#struct_name {
+                         #(#field_idents_vec),*
+                     })
+                 }
+                 _ => Err("Expected a record WitValue".to_string())
+             }
+         }
+       }
     };
 
     TokenStream::from(expanded)
