@@ -1,4 +1,4 @@
-use crate::bindings::exports::golem::agent::guest::{AgentDefinition, StatusUpdate};
+use crate::bindings::exports::golem::agent::guest::{AgentType, StatusUpdate};
 use golem_wasm_rpc::WitValue;
 
 // A simple Agent that every agent abstraction has to extend
@@ -26,7 +26,7 @@ use golem_wasm_rpc::WitValue;
 pub trait Agent: Send + Sync {
     // During implementation it should be possible to use DataValue for multi modal types
     fn invoke(&self, method_name: String, input: Vec<WitValue>) -> StatusUpdate;
-    fn get_definition(&self) -> AgentDefinition;
+    fn get_definition(&self) -> AgentType;
 }
 
 pub trait GetAgentId {

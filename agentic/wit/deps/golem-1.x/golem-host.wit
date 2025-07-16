@@ -5,7 +5,7 @@ package golem:api@1.1.7;
 interface host {
     use wasi:clocks/monotonic-clock@0.2.3.{duration};
     use golem:rpc/types@0.2.1.{component-id, uuid, worker-id};
-    use golem:agent/common.{agent-definition};
+    use golem:agent/common.{agent-type};
 
     /// An index into the persistent log storing all performed operations of a worker
     type oplog-index = u64;
@@ -272,7 +272,7 @@ interface host {
     /// the forked worker.
     fork: func(new-name: string) -> fork-result;
 
-    discover-agent-definitions: func() -> list<agent-definition>;
+    discover-agent-definitions: func() -> list<agent-type>;
 
 }
 

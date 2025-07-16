@@ -341,8 +341,8 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     });
 
     quote! {
-        golem_agentic::bindings::golem::agent::common::AgentDefinition {
-            agent_name: #agent_name.to_string(),
+        golem_agentic::bindings::golem::agent::common::AgentType {
+            type_name: #agent_name.to_string(),
             description: "".to_string(),
             methods: vec![#(#methods),*],
             requires: vec![]
@@ -434,7 +434,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
                 }
             }
 
-            fn get_definition(&self) -> ::golem_agentic::bindings::golem::agent::common::AgentDefinition {
+            fn get_definition(&self) -> ::golem_agentic::bindings::golem::agent::common::AgentType {
                 golem_agentic::agent_registry::get_agent_def_by_name(&#trait_name_str)
                     .expect("Agent definition not found")
             }
