@@ -1,4 +1,4 @@
-package golem:agentic;
+package golem:agent;
 
 interface common {
   use golem:rpc/types@0.2.1.{wit-type, wit-value};
