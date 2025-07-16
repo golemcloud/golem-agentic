@@ -4,7 +4,7 @@ use golem_wasm_rpc::{ResourceMode, WitTypeNode};
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 
-use golem_agentic::bindings::golem::agentic::common::WitType;
+use golem_agentic::bindings::golem::agent::common::WitType;
 #[allow(unused_imports)]
 use lazy_static::lazy_static;
 use syn::{parse_macro_input, Data, DeriveInput, Fields, Meta};
@@ -336,7 +336,7 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
             let input_parameters: Vec<_> = parameter_types.into_iter().map(|ty| {
                 let tokens = wit_type_to_tokens(&ty);
                 quote! {
-                    ::golem_agentic::bindings::golem::agentic::common::ParameterType::Wit(#tokens)
+                    ::golem_agentic::bindings::golem::agent::common::ParameterType::Wit(#tokens)
                 }
             }).collect();
 
@@ -344,20 +344,20 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
                 let tokens = wit_type_to_tokens(&ty);
 
                 quote! {
-                    ::golem_agentic::bindings::golem::agentic::common::ParameterType::Wit(#tokens)
+                    ::golem_agentic::bindings::golem::agent::common::ParameterType::Wit(#tokens)
                 }
             }).collect();
 
 
             Some(quote! {
-                golem_agentic::bindings::golem::agentic::common::AgentMethod {
+                golem_agentic::bindings::golem::agent::common::AgentMethod {
                     name: #method_name.to_string(),
                     description: #description.to_string(),
                     prompt_hint: None,
-                    input_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
+                    input_schema: ::golem_agentic::bindings::golem::agent::common::DataSchema::Structured(::golem_agentic::bindings::golem::agent::common::Structured {
                           parameters: vec![#(#input_parameters),*]
                     }),
-                    output_schema: ::golem_agentic::bindings::golem::agentic::common::DataSchema::Structured(::golem_agentic::bindings::golem::agentic::common::Structured {
+                    output_schema: ::golem_agentic::bindings::golem::agent::common::DataSchema::Structured(::golem_agentic::bindings::golem::agent::common::Structured {
                       parameters: vec![#(#output_parameters),*]
                     }),
                 }
@@ -368,7 +368,7 @@ fn get_agent_definition(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     });
 
     quote! {
-        golem_agentic::bindings::golem::agentic::common::AgentDefinition {
+        golem_agentic::bindings::golem::agent::common::AgentDefinition {
             agent_name: #agent_name.to_string(),
             description: "".to_string(),
             methods: vec![#(#methods),*],
@@ -436,7 +436,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
                 #method_name => {
                     #(#extraction)*
                     let result: String = self.#ident(#(#param_idents),*);
-                    ::golem_agentic::bindings::exports::golem::agentic_guest::guest::StatusUpdate::Emit(result.to_string())
+                    ::golem_agentic::bindings::exports::golem::agent::guest::StatusUpdate::Emit(result.to_string())
                 }
             });
         }
@@ -451,17 +451,17 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
 
         impl golem_agentic::agent::Agent for #self_ty {
-            fn invoke(&self, method_name: String, input: Vec<golem_wasm_rpc::WitValue>) -> ::golem_agentic::bindings::golem::agentic::common::StatusUpdate {
+            fn invoke(&self, method_name: String, input: Vec<golem_wasm_rpc::WitValue>) -> ::golem_agentic::bindings::golem::agent::common::StatusUpdate {
                 match method_name.as_str() {
                     #(#match_arms,)*
-                    _ =>  ::golem_agentic::bindings::golem::agentic::common::StatusUpdate::Emit(format!(
+                    _ =>  ::golem_agentic::bindings::golem::agent::common::StatusUpdate::Emit(format!(
                         "Method '{}' not found in agent '{}'",
                         method_name, #trait_name_str
                     )),
                 }
             }
 
-            fn get_definition(&self) -> ::golem_agentic::bindings::golem::agentic::common::AgentDefinition {
+            fn get_definition(&self) -> ::golem_agentic::bindings::golem::agent::common::AgentDefinition {
                 golem_agentic::agent_registry::get_agent_def_by_name(&#trait_name_str)
                     .expect("Agent definition not found")
             }
@@ -488,7 +488,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
                  };
 
                  let agent =
-                     golem_agentic::bindings::exports::golem::agentic_guest::guest::Agent::new(resolved_agent.clone());
+                     golem_agentic::bindings::exports::golem::agent::guest::Agent::new(resolved_agent.clone());
 
                  let handle = agent.handle();
 

@@ -1,6 +1,6 @@
 use crate::agent_registry::AgentId;
-use crate::bindings::exports::golem::agentic_guest::guest::{Agent, AgentRef, StatusUpdate};
-use crate::bindings::exports::golem::agentic_guest::guest::{AgentDefinition, Guest, GuestAgent};
+use crate::bindings::exports::golem::agent::guest::{AgentRef, StatusUpdate};
+use crate::bindings::exports::golem::agent::guest::{AgentDefinition, Guest, GuestAgent};
 use crate::bindings::golem::api::host;
 use golem_wasm_rpc::{WitValue};
 
