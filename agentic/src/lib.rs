@@ -93,7 +93,7 @@ impl GuestAgent for ResolvedAgent {
         }
     }
 
-    fn get_agent_id(&self) -> String {
+    fn get_id(&self) -> String {
         self.agent_id.clone()
     }
 
