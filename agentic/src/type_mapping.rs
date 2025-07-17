@@ -2,6 +2,7 @@ use golem_wasm_ast::analysis::analysed_type::{str, u32, u64};
 use golem_wasm_ast::analysis::AnalysedType;
 use golem_wasm_rpc::{NodeBuilder, WitValue};
 use golem_wasm_rpc::{Value, WitType};
+use crate::agent::Agent;
 
 pub trait AgentArg: ToValue + FromWitValue + ToWitType {
     fn to_value(&self) -> golem_wasm_rpc::Value {
@@ -28,6 +29,7 @@ impl<T: ToValue + FromWitValue + ToWitType> AgentArg for T {}
 pub trait ToValue {
     fn to_value(&self) -> golem_wasm_rpc::Value;
 }
+
 
 pub trait FromValue {
     fn from_value(value: golem_wasm_rpc::Value) -> Result<Self, String>

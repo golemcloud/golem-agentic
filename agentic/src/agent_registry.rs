@@ -1,11 +1,11 @@
 use crate::agent_instance_registry::AgentName;
-use crate::bindings::exports::golem::agent::guest::{AgentRef, AgentType};
+use crate::bindings::exports::golem::agent::guest::{AgentRef, AgentType, WitValue};
 use crate::ResolvedAgent;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-type AgentTraitName = String;
+type AgentTypeName = String;
 
 #[derive(Hash, PartialEq, Eq)]
 pub struct AgentId(pub String);
@@ -16,7 +16,7 @@ pub struct AgentRefInternal {
     agent_name: String,
 }
 
-static AGENT_DEF_REGISTRY: Lazy<Mutex<HashMap<AgentTraitName, AgentType>>> =
+static AGENT_DEF_REGISTRY: Lazy<Mutex<HashMap<AgentTypeName, AgentType>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 // Given an agent name, we can register an impl of agent-initiator
@@ -115,7 +115,7 @@ pub fn get_all_agent_definitions() -> Vec<AgentType> {
 }
 
 pub fn get_agent_initiator(
-    agent_trait_name: AgentTraitName,
+    agent_trait_name: AgentTypeName,
 ) -> Option<Arc<dyn AgentInitiator + Send + Sync>> {
     AGENT_INITIATOR_REGISTRY
         .lock()
@@ -125,5 +125,5 @@ pub fn get_agent_initiator(
 }
 
 pub trait AgentInitiator: Send + Sync {
-    fn initiate(&self) -> ResolvedAgent;
+    fn initiate(&self, params: Vec<WitValue>) -> ResolvedAgent;
 }

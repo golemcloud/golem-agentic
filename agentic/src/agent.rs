@@ -24,7 +24,6 @@ use golem_wasm_rpc::WitValue;
 //  ```
 // There is no need to implement `Agent` anywhere, as it is automatically implemented by the `[agent_implementation]` attribute.
 pub trait Agent: Send + Sync {
-    // During implementation it should be possible to use DataValue for multi modal types
     fn invoke(&self, method_name: String, input: Vec<WitValue>) -> StatusUpdate;
     fn get_definition(&self) -> AgentType;
 }
