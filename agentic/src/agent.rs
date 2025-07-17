@@ -24,6 +24,7 @@ use golem_wasm_rpc::WitValue;
 //  ```
 // There is no need to implement `Agent` anywhere, as it is automatically implemented by the `[agent_implementation]` attribute.
 pub trait Agent: Send + Sync {
+    fn get_id(&self) -> String;
     fn invoke(&self, method_name: String, input: Vec<WitValue>) -> StatusUpdate;
     fn get_definition(&self) -> AgentType;
 }

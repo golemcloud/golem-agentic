@@ -424,6 +424,10 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
 
         impl golem_agentic::agent::Agent for #self_ty {
+            fn get_id(&self) -> String {
+                self.agent_id.clone()
+            }
+
             fn invoke(&self, method_name: String, input: Vec<golem_wasm_rpc::WitValue>) -> ::golem_agentic::bindings::golem::agent::common::StatusUpdate {
                 match method_name.as_str() {
                     #(#match_arms,)*
