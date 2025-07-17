@@ -11,14 +11,14 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let tr_name_str = tr_name.to_string();
     let tr_name_str_kebab = to_kebab_case(&tr_name_str);
     let fn_suffix = &tr_name.to_string().to_lowercase();
-    let fn_name = format_ident!("register_agent_definition_{}", fn_suffix); // may be ctor is not required. But works now
+    let fn_name = format_ident!("register_generic_agent_type_{}", fn_suffix); // may be ctor is not required. But works now
 
     let agent_type = get_agent_type(&tr);
 
     let register_fn = quote! {
         #[::ctor::ctor]
         fn #fn_name() {
-            golem_agentic::agent_registry::register_agent_definition(
+            golem_agentic::agent_registry::register_generic_agent_type(
                #tr_name_str_kebab.to_string(),
                 #agent_type
             );
@@ -341,7 +341,7 @@ fn get_agent_type(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     });
 
     quote! {
-        golem_agentic::bindings::golem::agent::common::AgentType {
+        golem_agentic::agent_registry::GenericAgentType {
             type_name: #type_name.to_string(),
             description: "".to_string(),
             methods: vec![#(#methods),*],
@@ -482,6 +482,43 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     };
 
+    let fn_suffix = &trait_name_str_raw.to_string().to_lowercase();
+    let fn_name = format_ident!("register_agent_type_{}", fn_suffix); // may be ctor is not required. But works now
+
+
+    let register_constructor_fn = quote! {
+        #[::ctor::ctor]
+        fn #fn_name() {
+            let generic_agent_type = golem_agentic::agent_registry::get_generic_agent_type_by_name(
+                #trait_name_str
+            ).expect("Failed to get generic agent type");
+
+            let agent_params = <#self_ty as ::golem_agentic::AgentConstruct>::get_params();
+
+            let agent_params_as_parameter_types = agent_params.iter().map(|(param_name, wit_type)| {
+                ::golem_agentic::bindings::golem::agent::common::ParameterType::Wit(
+                    wit_type.clone()
+                )
+            }).collect();
+
+            let agent_constructor = golem_agentic::bindings::golem::agent::common::AgentConstructor {
+                name: None,
+                description: "".to_string(),
+                prompt_hint: None,
+                input_schema: ::golem_agentic::bindings::golem::agent::common::DataSchema::Structured(::golem_agentic::bindings::golem::agent::common::Structured {
+                          parameters: agent_params_as_parameter_types
+                    }),
+            };
+
+            let agent_type = generic_agent_type.to_agent_type(agent_constructor);
+
+            golem_agentic::agent_registry::register_agent_type(
+               #trait_name_str.to_string(),
+                agent_type
+            );
+        }
+    };
+
     let register_impl_fn = format_ident!(
         "register_agent_initiator_{}",
         trait_name_str_raw.to_lowercase()
@@ -502,6 +539,7 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         #impl_block
         #base_agent_impl
         #base_resolver_impl
+        #register_constructor_fn
         #register_impl_fn
     };
 
@@ -614,12 +652,12 @@ pub fn derive_agent_construct(input: TokenStream) -> TokenStream {
     let struct_name = &input.ident;
 
     let fields = match &input.data {
-        syn::Data::Struct(data_struct) => match &data_struct.fields {
-            syn::Fields::Named(named_fields) => &named_fields.named,
+        syn::Data::Struct(ds) => match &ds.fields {
+            syn::Fields::Named(named) => &named.named,
             _ => {
                 return syn::Error::new_spanned(
                     &input,
-                    "AgentConstruct can only be derived for structs with named fields",
+                    "AgentConstruct only supports named-field structs",
                 )
                     .to_compile_error()
                     .into();
@@ -635,50 +673,59 @@ pub fn derive_agent_construct(input: TokenStream) -> TokenStream {
         }
     };
 
-    // Collect all fields except `agent_id`
     let mut index = 0usize;
-    let mut assignments = Vec::new();
-    let mut struct_fields = Vec::new();
+    let mut construct_assignments = Vec::new();
+    let mut construct_fields = Vec::new();
+    let mut get_params_entries = Vec::new();
 
     for field in fields {
-        let field_name = field.ident.as_ref().unwrap();
-        if field_name == "agent_id" {
-            struct_fields.push(quote! {
-                agent_id: agent_id.clone()
-            });
+        let name = field.ident.as_ref().unwrap();
+        let ty = &field.ty;
+
+        if name == "agent_id" {
+            construct_fields.push(quote! { agent_id: agent_id.clone() });
             continue;
         }
 
-        let ty = &field.ty;
-
-        assignments.push(quote! {
-            let #field_name: #ty = <#ty as ::golem_agentic::AgentArg>::from_wit_value(
+        construct_assignments.push(quote! {
+            let #name: #ty = <#ty as ::golem_agentic::AgentArg>::from_wit_value(
                 params[#index].clone()
-            ).expect(concat!("failed to convert field: ", stringify!(#field_name)));
+            ).expect(concat!("AgentConstruct: failed to convert field ", stringify!(#name)));
         });
 
-        struct_fields.push(quote! {
-            #field_name
+        construct_fields.push(quote! { #name });
+
+        get_params_entries.push(quote! {
+            params.push((stringify!(#name).to_string(), <#ty as ::golem_agentic::AgentArg>::get_wit_type(),));
         });
 
         index += 1;
     }
 
-    quote! {
+    let expanded = quote! {
         impl ::golem_agentic::AgentConstruct for #struct_name {
             fn construct_from_params(
                 params: Vec<::golem_wasm_rpc::WitValue>,
                 agent_id: String
             ) -> Self {
-                #(#assignments)*
+                #(#construct_assignments)*
 
                 Self {
-                    #(#struct_fields),*
+                    #(#construct_fields),*
                 }
             }
+
+            fn get_params() -> Vec<(String, ::golem_wasm_rpc::WitType)> {
+                let mut params = Vec::new();
+                #(#get_params_entries)*
+                params
+            }
         }
-    }.into()
+    };
+
+    expanded.into()
 }
+
 
 fn to_kebab_case(s: &str) -> String {
     let mut result = String::new();
