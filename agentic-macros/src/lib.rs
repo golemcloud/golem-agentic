@@ -741,7 +741,7 @@ pub fn derive_agent_construct(input: TokenStream) -> TokenStream {
         Err(e) => return e.to_compile_error().into(),
     };
 
-    let constructor_fields = extract_constructor_fields(fields);
+    let constructor_fields = extract_constructor_fields(fields, &generic_agent_types);
     if let Err(err) = write_constructor_metadata(&constructor_fields, struct_name) {
         return syn::Error::new_spanned(&struct_name, err).to_compile_error().into();
     }
@@ -801,13 +801,31 @@ fn get_named_fields(input: &DeriveInput) -> syn::Result<&syn::punctuated::Punctu
     }
 }
 
-fn extract_constructor_fields(fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>) -> Vec<(String, String)> {
+fn extract_constructor_fields(
+    fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
+    generic_agent_types: &std::collections::HashSet<String>,
+) -> Vec<(String, String)> {
     fields.iter()
         .filter_map(|f| {
             let ident = f.ident.as_ref()?.to_string();
             if ident == "agent_id" {
                 return None;
             }
+
+            // Check if field type is a generic agent type, like T, U, etc.
+            let is_generic_agent_type = match &f.ty {
+                syn::Type::Path(type_path) => {
+                    // Only simple identifiers like `T`, not `std::vec::Vec<T>`
+                    type_path.path.segments.len() == 1 &&
+                        generic_agent_types.contains(&type_path.path.segments[0].ident.to_string())
+                }
+                _ => false
+            };
+
+            if is_generic_agent_type {
+                return None;
+            }
+
             let ty = &f.ty;
             Some((ident, quote!(#ty).to_string()))
         })
@@ -830,7 +848,6 @@ fn write_constructor_metadata(constructor_fields: &[(String, String)], struct_na
         .map_err(|e| format!("Failed to write constructor metadata to {}: {}", registry_path.display(), e))
 }
 
-#[allow(clippy::too_many_lines)]
 fn build_constructor_code(
     fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
     generic_agent_types: &std::collections::HashSet<String>,
