@@ -1,14 +1,37 @@
 use crate::agent_instance_registry::AgentName;
-use crate::bindings::exports::golem::agent::guest::{AgentRef, AgentType};
+use crate::bindings::exports::golem::agent::guest::{AgentRef, AgentType, WitValue};
 use crate::ResolvedAgent;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use crate::bindings::golem::agent::common::{AgentDependency, AgentMethod, AgentConstructor};
 
-type AgentTraitName = String;
+type AgentTypeName = String;
 
 #[derive(Hash, PartialEq, Eq)]
 pub struct AgentId(pub String);
+
+// An agent-type which is devoid of a few details from what's in WIT
+
+#[derive(Clone)]
+pub struct GenericAgentType {
+    pub type_name: String,
+    pub description: String,
+    pub methods: Vec<AgentMethod>,
+    pub requires: Vec<AgentDependency>
+}
+
+impl GenericAgentType {
+    pub fn to_agent_type(&self, agent_constructor: AgentConstructor) -> AgentType {
+        AgentType {
+            type_name: self.type_name.clone(),
+            description: self.description.clone(),
+            agent_constructor: agent_constructor,
+            methods: self.methods.clone(),
+            requires: self.requires.clone(),
+        }
+    }
+}
 
 pub struct AgentRefInternal {
     inner_instance: crate::bindings::exports::golem::agent::guest::Agent,
@@ -16,7 +39,10 @@ pub struct AgentRefInternal {
     agent_name: String,
 }
 
-static AGENT_DEF_REGISTRY: Lazy<Mutex<HashMap<AgentTraitName, AgentType>>> =
+static GENERIC_AGENT_TYPE_REGISTRY: Lazy<Mutex<HashMap<AgentTypeName, GenericAgentType>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+static AGENT_TYPE_REGISTRY: Lazy<Mutex<HashMap<AgentTypeName, AgentType>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 // Given an agent name, we can register an impl of agent-initiator
@@ -30,7 +56,27 @@ static AGENT_INSTANCE_REGISTRY: Lazy<Mutex<HashMap<AgentId, AgentRefInternal>>> 
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub fn register_agent_definition(agent_trait_name: String, def: AgentType) {
-    AGENT_DEF_REGISTRY
+    AGENT_TYPE_REGISTRY
+        .lock()
+        .unwrap()
+        .insert(agent_trait_name, def);
+}
+
+pub fn register_generic_agent_type(
+    agent_trait_name: String,
+    def: GenericAgentType,
+) {
+    GENERIC_AGENT_TYPE_REGISTRY
+        .lock()
+        .unwrap()
+        .insert(agent_trait_name, def);
+}
+
+pub fn register_agent_type(
+    agent_trait_name: String,
+    def: AgentType,
+) {
+    AGENT_TYPE_REGISTRY
         .lock()
         .unwrap()
         .insert(agent_trait_name, def);
@@ -98,7 +144,17 @@ pub fn get_agent_instance(agent_id: AgentId) -> Option<AgentRef> {
 }
 
 pub fn get_agent_def_by_name(agent_trait_name: &str) -> Option<AgentType> {
-    AGENT_DEF_REGISTRY
+    AGENT_TYPE_REGISTRY
+        .lock()
+        .unwrap()
+        .get(agent_trait_name)
+        .cloned()
+}
+
+pub fn get_generic_agent_type_by_name(
+    agent_trait_name: &str,
+) -> Option<GenericAgentType> {
+    GENERIC_AGENT_TYPE_REGISTRY
         .lock()
         .unwrap()
         .get(agent_trait_name)
@@ -106,7 +162,7 @@ pub fn get_agent_def_by_name(agent_trait_name: &str) -> Option<AgentType> {
 }
 
 pub fn get_all_agent_definitions() -> Vec<AgentType> {
-    AGENT_DEF_REGISTRY
+    AGENT_TYPE_REGISTRY
         .lock()
         .unwrap()
         .values()
@@ -115,7 +171,7 @@ pub fn get_all_agent_definitions() -> Vec<AgentType> {
 }
 
 pub fn get_agent_initiator(
-    agent_trait_name: AgentTraitName,
+    agent_trait_name: AgentTypeName,
 ) -> Option<Arc<dyn AgentInitiator + Send + Sync>> {
     AGENT_INITIATOR_REGISTRY
         .lock()
@@ -125,5 +181,5 @@ pub fn get_agent_initiator(
 }
 
 pub trait AgentInitiator: Send + Sync {
-    fn initiate(&self) -> ResolvedAgent;
+    fn initiate(&self, params: Vec<WitValue>) -> ResolvedAgent;
 }

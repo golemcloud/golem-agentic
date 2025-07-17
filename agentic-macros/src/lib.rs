@@ -11,14 +11,14 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let tr_name_str = tr_name.to_string();
     let tr_name_str_kebab = to_kebab_case(&tr_name_str);
     let fn_suffix = &tr_name.to_string().to_lowercase();
-    let fn_name = format_ident!("register_agent_definition_{}", fn_suffix); // may be ctor is not required. But works now
+    let fn_name = format_ident!("register_generic_agent_type_{}", fn_suffix); // may be ctor is not required. But works now
 
     let agent_type = get_agent_type(&tr);
 
     let register_fn = quote! {
         #[::ctor::ctor]
         fn #fn_name() {
-            golem_agentic::agent_registry::register_agent_definition(
+            golem_agentic::agent_registry::register_generic_agent_type(
                #tr_name_str_kebab.to_string(),
                 #agent_type
             );
@@ -341,7 +341,7 @@ fn get_agent_type(tr: &syn::ItemTrait) -> proc_macro2::TokenStream {
     });
 
     quote! {
-        golem_agentic::bindings::golem::agent::common::AgentType {
+        golem_agentic::agent_registry::GenericAgentType {
             type_name: #type_name.to_string(),
             description: "".to_string(),
             methods: vec![#(#methods),*],
@@ -447,13 +447,18 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         struct #initiator;
 
         impl golem_agentic::agent_registry::AgentInitiator for #initiator {
-            fn initiate(&self) -> golem_agentic::ResolvedAgent {
+            fn initiate(&self, params: Vec<golem_wasm_rpc::WitValue>) -> golem_agentic::ResolvedAgent {
 
                  use golem_agentic::agent::{GetAgentId};
 
                  let agent_id = #self_ty::get_agent_id();
 
-                 let agent = ::std::sync::Arc::new(#self_ty {agent_id: agent_id.clone()});
+                let agent = ::std::sync::Arc::new(
+                    <#self_ty as ::golem_agentic::AgentConstruct>::construct_from_params(
+                        params,
+                        agent_id.clone()
+                    )
+                );
 
                  let resolved_agent = golem_agentic::ResolvedAgent {
                       agent: agent,
@@ -477,6 +482,43 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     };
 
+    let fn_suffix = &trait_name_str_raw.to_string().to_lowercase();
+    let fn_name = format_ident!("register_agent_type_{}", fn_suffix); // may be ctor is not required. But works now
+
+
+    let register_constructor_fn = quote! {
+        #[::ctor::ctor]
+        fn #fn_name() {
+            let generic_agent_type = golem_agentic::agent_registry::get_generic_agent_type_by_name(
+                #trait_name_str
+            ).expect("Failed to get generic agent type");
+
+            let agent_params = <#self_ty as ::golem_agentic::AgentConstruct>::get_params();
+
+            let agent_params_as_parameter_types = agent_params.iter().map(|(param_name, wit_type)| {
+                ::golem_agentic::bindings::golem::agent::common::ParameterType::Wit(
+                    wit_type.clone()
+                )
+            }).collect();
+
+            let agent_constructor = golem_agentic::bindings::golem::agent::common::AgentConstructor {
+                name: None,
+                description: "".to_string(),
+                prompt_hint: None,
+                input_schema: ::golem_agentic::bindings::golem::agent::common::DataSchema::Structured(::golem_agentic::bindings::golem::agent::common::Structured {
+                          parameters: agent_params_as_parameter_types
+                    }),
+            };
+
+            let agent_type = generic_agent_type.to_agent_type(agent_constructor);
+
+            golem_agentic::agent_registry::register_agent_type(
+               #trait_name_str.to_string(),
+                agent_type
+            );
+        }
+    };
+
     let register_impl_fn = format_ident!(
         "register_agent_initiator_{}",
         trait_name_str_raw.to_lowercase()
@@ -492,131 +534,16 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
         }
     };
 
-    let local_trait_name = format_ident!("Local{}", trait_name);
-
-    let local_client = quote! {
-        pub struct #local_trait_name;
-
-        impl #local_trait_name {
-            pub fn new(agent_id: &str) -> ::std::sync::Arc<dyn #trait_name + Send + Sync> {
-                // this ensures you use a different node to invoke methods on the agent, addressing scalability
-                 ::std::sync::Arc::new(#self_ty {agent_id: agent_id.to_string()})
-            }
-        }
-    };
 
     let result = quote! {
         #impl_block
         #base_agent_impl
         #base_resolver_impl
+        #register_constructor_fn
         #register_impl_fn
-        #local_client
     };
 
     result.into()
-}
-
-// Well, let's try to avoid this!!!
-#[proc_macro_derive(AgentConstructor)]
-pub fn derive_agent_constructor(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-
-    let struct_ident = input.ident.clone();
-    let generics = input.generics;
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    let fields = match input.data {
-        Data::Struct(data_struct) => match data_struct.fields {
-            Fields::Named(fields_named) => fields_named.named,
-            _ => {
-                return syn::Error::new_spanned(
-                    data_struct.struct_token,
-                    "Only named fields are supported",
-                )
-                .to_compile_error()
-                .into();
-            }
-        },
-        _ => {
-            return syn::Error::new_spanned(
-                input.ident.to_string(),
-                "AgentConstructor can only be derived for structs",
-            )
-            .to_compile_error()
-            .into();
-        }
-    };
-
-    let mut extra_let_bindings = Vec::new();
-    let mut extra_struct_fields = Vec::new();
-
-    for field in fields.iter() {
-        let field_ident = field.ident.as_ref().unwrap();
-        let field_ty = &field.ty;
-        let name_str = field_ident.to_string();
-
-        if name_str == "agent_id" {
-            continue;
-        }
-
-        let mut custom_agent_id = None;
-        let mut custom_type_name = None;
-
-        for attr in &field.attrs {
-            match &attr.meta {
-                Meta::NameValue(nv) if nv.path.is_ident("agent_id") => {
-                    if let syn::Expr::Lit(expr_lit) = &nv.value {
-                        if let syn::Lit::Str(litstr) = &expr_lit.lit {
-                            custom_agent_id = Some(litstr.value());
-                        }
-                    }
-                }
-                Meta::NameValue(nv) if nv.path.is_ident("type_name") => {
-                    if let syn::Expr::Lit(expr_lit) = &nv.value {
-                        if let syn::Lit::Str(litstr) = &expr_lit.lit {
-                            custom_type_name = Some(litstr.value());
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        let agent_id_expr = custom_agent_id
-            .as_ref()
-            .map(|s| syn::parse_str::<syn::Expr>(&s).unwrap())
-            .unwrap_or_else(|| syn::parse_quote! { agent_id.clone() }); // TODO; it's always a remote agent.
-
-        let type_name_expr = custom_type_name
-            .as_ref()
-            .map(|s| syn::parse_str::<syn::Expr>(&s).unwrap())
-            .unwrap_or_else(|| syn::parse_quote! { type_name.clone() }); // TODO; type_name expr should be option so that it can piggyback on local calls
-
-        extra_let_bindings.push(quote! {
-            // I think this is wrong. the constructor is making use of same agent id and agent name.
-            // I think probably one way to distinguish between local and remote agents is - whether or not
-            // the given field has an agent-id and agent-name. Any local dependencies shouldn't need these fields
-            // that will be the way to distinguish between local and remote agents
-           let #field_ident: #field_ty = #field_ty::new(#agent_id_expr, #type_name_expr);
-        });
-
-        extra_struct_fields.push(quote! { #field_ident });
-    }
-
-    let expanded = quote! {
-        impl #impl_generics #struct_ident #ty_generics #where_clause {
-            pub fn new(agent_id: String, type_name: String) -> Self {
-                #(#extra_let_bindings)*
-                Self {
-                    agent_id,
-                    type_name,
-                    #(#extra_struct_fields),*
-                }
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
 }
 
 #[proc_macro_derive(AgentArg)]
@@ -718,6 +645,87 @@ pub fn derive_agent_arg(input: TokenStream) -> TokenStream {
 
     TokenStream::from(expanded)
 }
+
+#[proc_macro_derive(AgentConstruct)]
+pub fn derive_agent_construct(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let struct_name = &input.ident;
+
+    let fields = match &input.data {
+        syn::Data::Struct(ds) => match &ds.fields {
+            syn::Fields::Named(named) => &named.named,
+            _ => {
+                return syn::Error::new_spanned(
+                    &input,
+                    "AgentConstruct only supports named-field structs",
+                )
+                    .to_compile_error()
+                    .into();
+            }
+        },
+        _ => {
+            return syn::Error::new_spanned(
+                &input,
+                "AgentConstruct can only be derived for structs",
+            )
+                .to_compile_error()
+                .into();
+        }
+    };
+
+    let mut index = 0usize;
+    let mut construct_assignments = Vec::new();
+    let mut construct_fields = Vec::new();
+    let mut get_params_entries = Vec::new();
+
+    for field in fields {
+        let name = field.ident.as_ref().unwrap();
+        let ty = &field.ty;
+
+        if name == "agent_id" {
+            construct_fields.push(quote! { agent_id: agent_id.clone() });
+            continue;
+        }
+
+        construct_assignments.push(quote! {
+            let #name: #ty = <#ty as ::golem_agentic::AgentArg>::from_wit_value(
+                params[#index].clone()
+            ).expect(concat!("AgentConstruct: failed to convert field ", stringify!(#name)));
+        });
+
+        construct_fields.push(quote! { #name });
+
+        get_params_entries.push(quote! {
+            params.push((stringify!(#name).to_string(), <#ty as ::golem_agentic::AgentArg>::get_wit_type(),));
+        });
+
+        index += 1;
+    }
+
+    let expanded = quote! {
+        impl ::golem_agentic::AgentConstruct for #struct_name {
+            fn construct_from_params(
+                params: Vec<::golem_wasm_rpc::WitValue>,
+                agent_id: String
+            ) -> Self {
+                #(#construct_assignments)*
+
+                Self {
+                    #(#construct_fields),*
+                }
+            }
+
+            fn get_params() -> Vec<(String, ::golem_wasm_rpc::WitType)> {
+                let mut params = Vec::new();
+                #(#get_params_entries)*
+                params
+            }
+        }
+    };
+
+    expanded.into()
+}
+
 
 fn to_kebab_case(s: &str) -> String {
     let mut result = String::new();

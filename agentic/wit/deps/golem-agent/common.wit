@@ -6,8 +6,16 @@ interface common {
     record agent-type {
         type-name:  string,
         description: string,
+        agent-constructor: agent-constructor,
         methods:     list<agent-method>,
         requires:    list<agent-dependency>,
+    }
+
+    record agent-constructor {
+        name:          option<string>,
+        description:   string,
+        prompt-hint:   option<string>,
+        input-schema:  data-schema,
     }
 
     record agent-dependency {

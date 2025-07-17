@@ -12,7 +12,7 @@ interface guest {
     }
 
     resource agent {
-        constructor(agent-name: string);
+        constructor(agent-name: string, params: list<wit-value>);
 
         get-id: func() -> string;
 

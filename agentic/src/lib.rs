@@ -5,12 +5,14 @@ use crate::bindings::golem::api::host;
 use golem_wasm_rpc::WitValue;
 
 pub use type_mapping::*;
+pub use agent_construct::*;
 
 pub mod agent;
 pub mod agent_instance_registry;
 pub mod agent_registry;
 pub mod bindings;
 mod type_mapping;
+mod agent_construct;
 
 #[derive(Clone)]
 pub struct ResolvedAgent {
@@ -71,7 +73,7 @@ impl Guest for Component {
 }
 
 impl GuestAgent for ResolvedAgent {
-    fn new(agent_type: String) -> ResolvedAgent {
+    fn new(agent_type: String, params: Vec<golem_wasm_rpc::WitValue>) -> ResolvedAgent {
         let agent_types = agent_registry::get_all_agent_definitions();
 
         let agent_type = agent_types
@@ -93,7 +95,7 @@ impl GuestAgent for ResolvedAgent {
         let agent_initiator = agent_registry::get_agent_initiator(agent_type.type_name.clone());
 
         if let Some(agent) = agent_initiator {
-            let agent = agent.initiate();
+            let agent = agent.initiate(params);
             agent
         } else {
             panic!(
