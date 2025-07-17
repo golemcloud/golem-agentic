@@ -13,6 +13,29 @@ pub struct AgentId(pub String);
 
 // An agent-type which is devoid of a few details from what's in WIT
 
+static CONSTRUCTOR_REGISTRY: once_cell::sync::Lazy<std::sync::Mutex<HashMap<String, Vec<(String, String)>>>> =
+    once_cell::sync::Lazy::new(|| std::sync::Mutex::new(HashMap::new()));
+
+pub fn register_constructor(
+    agent_type_name: String,
+    constructor: Vec<(String, String)>,
+) {
+    CONSTRUCTOR_REGISTRY
+        .lock()
+        .unwrap()
+        .insert(agent_type_name, constructor);
+}
+
+pub fn get_constructor(
+    agent_type_name: &str,
+) -> Option<Vec<(String, String)>> {
+    CONSTRUCTOR_REGISTRY
+        .lock()
+        .unwrap()
+        .get(agent_type_name)
+        .cloned()
+}
+
 #[derive(Clone)]
 pub struct GenericAgentType {
     pub type_name: String,

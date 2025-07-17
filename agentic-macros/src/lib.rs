@@ -1,8 +1,12 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use proc_macro2::Ident;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DeriveInput, Fields, Meta};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, Type};
+use golem_agentic::agent_registry::{get_constructor, register_constructor};
 
 #[proc_macro_attribute]
 pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -24,6 +28,59 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
             );
         }
     };
+
+    let registry_path: PathBuf = dirs::cache_dir()
+        .expect("Could not find cache dir")
+        .join("golem-agentic/constructors")
+        .join(format!("{}Impl.json", tr_name_str.to_string()));
+
+    let json = match std::fs::read_to_string(&registry_path) {
+        Ok(s) => s,
+        Err(e) => return syn::Error::new_spanned(
+            &tr_name_str,
+            format!("Could not read constructor metadata at {}: {}", registry_path.display(), e),
+        ).to_compile_error().into(),
+    };
+
+    let raw_fields: Vec<(String, String)> = match serde_json::from_str(&json) {
+        Ok(fields) => fields,
+        Err(e) => return syn::Error::new_spanned(
+            &tr_name_str,
+            format!("Failed to parse constructor metadata: {}", e),
+        ).to_compile_error().into(),
+    };
+
+    let raw_params: Vec<(String, String)> = match serde_json::from_str(&json) {
+        Ok(params) => params,
+        Err(e) => return syn::Error::new_spanned(
+            &tr_name_str,
+            format!("Failed to parse constructor metadata JSON: {}", e),
+        ).to_compile_error().into(),
+    };
+
+    let constructor_params: Vec<(Ident, Type)> = raw_params
+        .into_iter()
+        .map(|(name, ty_str)| {
+            let ident = format_ident!("{}", name);
+            let ty = syn::parse_str::<Type>(&ty_str).unwrap_or_else(|_| {
+                panic!("Failed to parse type string `{}` for parameter `{}`", ty_str, name)
+            });
+            (ident, ty)
+        })
+        .collect();
+
+    let constructor_params_decl = constructor_params.iter().map(|(name, ty)| {
+        quote! { #name: #ty }
+    });
+
+    let constructor_param_names = constructor_params.iter().map(|(name, _)| quote! { #name });
+
+
+    let constructor_params_wit = constructor_params.iter().map(|(name, _)| {
+        quote! {
+        golem_wasm_rpc::WitValue::from(golem_agentic::AgentArg::to_value(&#name))
+    }
+    });
 
     let remote_trait_name = format_ident!("Remote{}", tr_name);
 
@@ -136,15 +193,19 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         impl #remote_trait_name {
-            pub fn new() -> Result<Self, String> {
+            pub fn new(#(#constructor_params_decl),*) -> Result<Self, String> {
                 let current_component_id = ::golem_agentic::bindings::golem::api::host::get_self_metadata().worker_id.component_id;
                 let rpc = golem_wasm_rpc::WasmRpc::ephemeral(current_component_id.clone());
                 let type_name = golem_wasm_rpc::Value::String(#agent_type.type_name.to_string());
                 let type_name_wit_value = &[golem_wasm_rpc::WitValue::from(type_name.clone())];
 
+                 let input_args = vec![
+                    #(#constructor_params_wit),*
+                ];
+
                 let agent_handle_in_vec = rpc.invoke_and_await(
                     "golem:simulated-agentic/simulated-agent.{weather-agent.new}",
-                    &[]
+                    input_args.as_slice()
                 ).map_err(|e| format!("Failed to invoke get-agent: {}", e))?;
 
                 let value = golem_wasm_rpc::Value::from(agent_handle_in_vec);
@@ -677,10 +738,49 @@ pub fn derive_agent_construct(input: TokenStream) -> TokenStream {
         }
     };
 
+    // Serialize the types to cache so that agent definition macro
+    // which internally implement remote-client can refer to these
+    // These can be solved otherwise if we change the macro pattern,
+    // but this is more of over-coming the proc macro, and not exactly
+    // the way we designed macro annotations
+    let constructor_fields: Vec<(String, String)> = fields
+        .iter()
+        .filter_map(|f| {
+            let ident = f.ident.as_ref()?.to_string();
+            if ident == "agent_id" {
+                return None;
+            }
+
+            let ty = &f.ty;
+            let ty_string = quote!(#ty).to_string(); // cleanly get just the type
+
+            Some((ident, ty_string))
+        })
+        .collect();
+
+    let mut registry_dir: PathBuf = dirs::cache_dir()
+        .expect("Could not find a system cache directory")
+        .join("golem-agentic/constructors");
+
+    std::fs::create_dir_all(&registry_dir)
+        .expect("Failed to create golem-agentic constructor registry directory");
+
+    let registry_path = registry_dir.join(format!("{}.json", struct_name.to_string()));
+
+    let json = serde_json::to_string(&constructor_fields)
+        .expect("Failed to serialize constructor fields");
+
+    let result = std::fs::write(&registry_path, json);
+
+    dbg!(&result);
+
     let mut index = 0usize;
     let mut construct_assignments = Vec::new();
     let mut construct_fields = Vec::new();
     let mut get_params_entries = Vec::new();
+
+    // For const CONSTRUCTOR_PARAMS: Vec<(&'static str, &'static str)>
+    let mut constructor_params_const_entries = Vec::new();
 
     for field in fields {
         let name = field.ident.as_ref().unwrap();
@@ -701,6 +801,12 @@ pub fn derive_agent_construct(input: TokenStream) -> TokenStream {
 
         get_params_entries.push(quote! {
             params.push((stringify!(#name).to_string(), <#ty as ::golem_agentic::AgentArg>::get_wit_type(),));
+        });
+
+        // Add entries for the const array: (param_name, "type_as_string")
+        // Use `stringify!(#ty)` to get the Rust type as string literal
+        constructor_params_const_entries.push(quote! {
+            (stringify!(#name), stringify!(#ty))
         });
 
         index += 1;
@@ -725,10 +831,17 @@ pub fn derive_agent_construct(input: TokenStream) -> TokenStream {
                 params
             }
         }
+
+        impl #struct_name {
+            pub const CONSTRUCTOR_PARAMS: &'static [(&'static str, &'static str)] = &[
+                #(#constructor_params_const_entries),*
+            ];
+        }
     };
 
     expanded.into()
 }
+
 
 
 fn to_kebab_case(s: &str) -> String {
