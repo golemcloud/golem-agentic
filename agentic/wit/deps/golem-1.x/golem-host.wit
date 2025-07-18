@@ -272,7 +272,18 @@ interface host {
     /// the forked worker.
     fork: func(new-name: string) -> fork-result;
 
-    discover-agent-definitions: func() -> list<agent-type>;
+    discover-agent-types: func() -> list<agent-type>;
+
+    // In the host spec, we had remote-agent resource that handled everything
+    // but this was replaced with things handled at the guest side itself - i.e, for invokes
+    // direclty using wasm-rpc than going via host
+    // resource remote-agent {
+    //     create: static func(agent-type: string, input: data-value) -> result<agent, agent-error>;
+    //     ...
+    //   }
+    // As a replacement (for prototype) we need to find the component id of the agent type
+    // this functionality has to exist in some form in host
+    get-agent-component: func(agent-type: string) -> option<component-id>;
 
 }
 
