@@ -201,7 +201,12 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
 
         impl #remote_trait_name {
             pub fn new(#(#constructor_params_decl),*) -> Result<Self, String> {
-                let current_component_id = ::golem_agentic::bindings::golem::api::host::get_self_metadata().worker_id.component_id;
+                let current_component_id_opt = ::golem_agentic::bindings::golem::api::host::get_agent_component(#tr_name_str_kebab);
+                let current_component_id = match current_component_id_opt {
+                    Some(id) => id,
+                    None => return Err(format!("Failed to get current component ID for agent type: {}", #tr_name_str_kebab)),
+                };
+
                 let rpc = golem_wasm_rpc::WasmRpc::ephemeral(current_component_id.clone());
                 let type_name = golem_wasm_rpc::Value::String(#agent_type.type_name.to_string());
                 let type_name_wit_value = &[golem_wasm_rpc::WitValue::from(type_name.clone())];
