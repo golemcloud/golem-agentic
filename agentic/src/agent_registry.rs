@@ -36,7 +36,7 @@ pub fn get_constructor(
         .cloned()
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GenericAgentType {
     pub type_name: String,
     pub description: String,
@@ -182,6 +182,15 @@ pub fn get_generic_agent_type_by_name(
         .unwrap()
         .get(agent_trait_name)
         .cloned()
+}
+
+pub fn get_all_generic_agent_types() -> Vec<GenericAgentType> {
+    GENERIC_AGENT_TYPE_REGISTRY
+        .lock()
+        .unwrap()
+        .values()
+        .cloned()
+        .collect::<Vec<_>>()
 }
 
 pub fn get_all_agent_definitions() -> Vec<AgentType> {

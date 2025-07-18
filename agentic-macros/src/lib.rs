@@ -138,7 +138,7 @@ pub fn agent_definition(_attrs: TokenStream, item: TokenStream) -> TokenStream {
             };
 
             Some(quote! {
-                async fn #method_name(#(#inputs),*) -> #return_type {
+                pub async fn #method_name(#(#inputs),*) -> #return_type {
                     let rpc = golem_wasm_rpc::WasmRpc::new(&self.worker_id);
                     let mut inputs = vec![
                         golem_wasm_rpc::WitValue::from(self.handle.clone()),
@@ -571,9 +571,20 @@ pub fn agent_implementation(_attrs: TokenStream, item: TokenStream) -> TokenStre
     let register_constructor_fn = quote! {
         #[::ctor::ctor]
         fn #fn_name() {
-            let generic_agent_type = golem_agentic::agent_registry::get_generic_agent_type_by_name(
+            let generic_agent_type_optional = golem_agentic::agent_registry::get_generic_agent_type_by_name(
                 #trait_name_str
-            ).expect("Failed to get generic agent type");
+            );
+
+            let generic_agent_type = match generic_agent_type_optional {
+                Some(generic_agent_type) => {
+                    generic_agent_type
+                }
+                None => {
+                    let existing_agent_types = golem_agentic::agent_registry::get_all_generic_agent_types();
+
+                    panic!("Generic agent type not found for trait: {}. Available: {:?}", #trait_name_str, existing_agent_types);
+                }
+            };
 
             let agent_params = <#self_ty #ty_generics as ::golem_agentic::AgentConstruct>::get_params();
 
