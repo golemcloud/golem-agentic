@@ -36,8 +36,10 @@ interface common {
   }
 
   variant data-schema {
-    %tuple(list<element-schema>),
-    multimodal(list<element-schema>),
+    /// List of named elements
+    %tuple(list<tuple<string, element-schema>>),
+    /// List of named variants
+    multimodal(list<tuple<string, element-schema>>),
   }
 
   variant data-value {
@@ -46,9 +48,9 @@ interface common {
   }
 
   variant element-schema {
-    component-model(wit-type),
-    unstructured-text(text-descriptor),
-    unstructured-binary(binary-descriptor),
+    component-model(tuple<string, wit-type>),
+    unstructured-text(tuple<string, text-descriptor>),
+    unstructured-binary(tuple<string, binary-descriptor>),
   }
 
   variant element-value {
