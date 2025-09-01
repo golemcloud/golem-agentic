@@ -110,10 +110,18 @@ function getMethodProxy(
 
     const rpcForInvokeMethod = new WasmRpc(workerId);
 
-    const rpcResult = rpcForInvokeMethod.invokeAndAwait(
+    const rpcResultFuture = rpcForInvokeMethod.asyncInvokeAndAwait(
       functionName,
       parameterWitValues,
     );
+
+    const rpcResult = rpcResultFuture.get();
+
+    if (!rpcResult) {
+      throw new Error(
+        `No result returned for ${functionName} from agent-id ${workerId.workerName}`,
+      );
+    }
 
     const rpcWitValue =
       rpcResult.tag === 'err'
