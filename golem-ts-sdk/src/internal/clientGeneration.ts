@@ -119,7 +119,7 @@ function getMethodProxy(
 
     if (!rpcResult) {
       throw new Error(
-        `No result returned for ${functionName} from agent-id ${workerId.workerName}`,
+        `Agent "${workerId.workerName}" did not return a result for function "${functionName}"`,
       );
     }
 
@@ -127,7 +127,8 @@ function getMethodProxy(
       rpcResult.tag === 'err'
         ? (() => {
             throw new Error(
-              'Failed to invoke function: ' + JSON.stringify(rpcResult.val),
+              `Failed to invoke function ${functionName} in agent ${workerId.workerName}: ` +
+                JSON.stringify(rpcResult.val),
             );
           })()
         : rpcResult.val;
