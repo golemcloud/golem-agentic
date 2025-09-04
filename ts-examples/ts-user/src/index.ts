@@ -5,6 +5,8 @@ import {
     description,
 } from '@golemcloud/golem-ts-sdk';
 
+import { getSelfMetadata } from 'golem:api/host@1.1.7';
+
 type Question = {
     text: string
 }
@@ -21,6 +23,8 @@ class AssistantAgent extends BaseAgent {
     @description("This method allows the agent to answer your question")
     async ask(question: Question): Promise<string> {
         console.log(question);
+
+        console.log(getSelfMetadata().workerId.workerName);
 
         const location: LatLong = { lat: 12.34, long: 56.78 };
 

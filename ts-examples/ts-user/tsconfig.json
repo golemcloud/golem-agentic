@@ -10,7 +10,12 @@
     "outDir": "./dist",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "useDefineForClassFields": false
+    "useDefineForClassFields": false,
+    "paths": {
+      "golem:api/host@1.1.7": [
+        "./node_modules/@golemcloud/golem-ts-sdk/types/golem_api_1_1_7_host.d.ts"
+      ]
+    }
   },
   "include": [
     "src/**/*",
