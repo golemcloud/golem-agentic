@@ -34,6 +34,18 @@ class WeatherAgent extends BaseAgent {
   async fun3(param2: CustomData): Types.PromiseType {
     return Promise.resolve(`Weather in ${param2.data} is sunny!`);
   }
+
+  async fun4(location: CustomData) {
+    return;
+  }
+
+  fun5 = (location: string) => {
+    return Promise.resolve(`Weather in ${location} is sunny!`);
+  };
+
+  fun6 = (location: string) => {
+    return;
+  };
 }
 
 export interface CustomData {
@@ -147,4 +159,12 @@ class AssistantAgent extends BaseAgent {
   async fun19(text: string): Promise<EitherZ> {
     return { tag: 'ok', val: 'hello' };
   }
+
+  async fun20(text: string) {
+    console.log('Hello World');
+  }
+
+  fun21 = (text: string) => {
+    console.log('Hello World');
+  };
 }
