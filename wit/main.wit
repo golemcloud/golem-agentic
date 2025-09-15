@@ -9,6 +9,10 @@ world agent-guest {
   import golem:rdbms/mysql@0.0.1;
   import golem:rdbms/types@0.0.1;
 
+  import golem:api/context@1.1.7;
+  import golem:api/oplog@1.1.7;
+  import golem:durability/durability@1.2.1;
+
   import golem:exec/executor@1.0.0;
   import golem:exec/types@1.0.0;
   import golem:graph/connection@1.0.0;
@@ -30,6 +34,15 @@ world agent-guest {
   import golem:video-generation/video-generation@1.0.0;
   import golem:web-search/types@1.0.0;
   import golem:web-search/web-search@1.0.0;
+
+  import wasi:blobstore/blobstore;
+  import wasi:blobstore/container;
+  import wasi:blobstore/types;
+
+  import wasi:keyvalue/eventual@0.1.0;
+  import wasi:keyvalue/eventual-batch@0.1.0;
+  import wasi:keyvalue/types@0.1.0;
+  import wasi:keyvalue/wasi-keyvalue-error@0.1.0;
 
   include golem:agent/agent-guest;
 }
