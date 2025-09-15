@@ -25,6 +25,7 @@ import {
   UnionWithLiterals,
   UnionType,
   TaggedUnion,
+  UnionWithOnlyLiterals,
 } from './testTypes';
 
 @agent()
@@ -87,6 +88,10 @@ class SimpleAgent extends BaseAgent {
   async fun9(param: TaggedUnion): Promise<TaggedUnion> {
     return param;
   }
+
+  async fun10(param: UnionWithOnlyLiterals): Promise<UnionWithOnlyLiterals> {
+    return param;
+  }
 }
 
 export interface CustomData {
@@ -132,6 +137,7 @@ class ComplexAgent extends BaseAgent {
     optionalStringType: string | undefined,
     optionalUnionType: UnionType | undefined,
     taggedUnionType: TaggedUnion,
+    unionWithOnlyLiterals: UnionWithOnlyLiterals,
   ): Types.PromiseType {
     return Promise.resolve(`Weather for ${location} is sunny!`);
   }
