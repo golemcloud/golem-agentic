@@ -296,7 +296,42 @@ export function fromTsTypeInternal(type: TsType, scope: Option.Option<TypeMappin
     case "union": {
       let fieldIdx = 1;
       const possibleTypes: NameOptionTypePair[] = [];
-      let boolTracked = false;
+
+      const taggedUnions =
+        getTaggedUnions(type.unionTypes);
+
+      if (Option.isSome(taggedUnions)) {
+        for (const taggedTypeMetadata of taggedUnions.val) {
+
+          if (!isKebabCase(taggedTypeMetadata.tagLiteralName)) {
+            return Either.left(`Tagged union case names must be in kebab-case. Found: ${taggedTypeMetadata.tagLiteralName}`);
+          }
+
+          if (Option.isSome(taggedTypeMetadata.valueType) && taggedTypeMetadata.valueType.val[1].kind === "literal") {
+            return Either.left("Tagged unions cannot have literal types in the value section")
+          }
+
+          if (Option.isNone(taggedTypeMetadata.valueType)) {
+            possibleTypes.push({
+              name: taggedTypeMetadata.tagLiteralName
+            })
+          } else {
+            const result =
+              fromTsTypeInternal(taggedTypeMetadata.valueType.val[1], Option.none());
+
+            if (Either.isLeft(result)) {
+              return result;
+            }
+
+            possibleTypes.push({
+              name: taggedTypeMetadata.tagLiteralName,
+              typ: result.val,
+            });
+          }
+        }
+
+        return Either.right(variant(type.name, possibleTypes));
+      }
 
       // If the union includes undefined, we need to treat it as option
       if (includesUndefined(type.unionTypes)) {
@@ -327,19 +362,25 @@ export function fromTsTypeInternal(type: TsType, scope: Option.Option<TypeMappin
         return Either.right(option(undefined, innerTypeEither.val))
       }
 
-      for (const t of type.unionTypes) {
-        if (t.kind === "boolean" || t.name === "false" || t.name === "true") {
-          if (boolTracked) {
-            continue;
-          }
-          boolTracked = true;
-          possibleTypes.push({
-            name: variantCaseName(fieldIdx++),
-            typ: bool(),
-          });
-          continue;
-        }
+      // If union has both true and false (because ts-morph consider boolean to be a union of literal true and literal false)
 
+      const hasFalseLiteral = type.unionTypes.some(t => t.kind === 'literal' && t.literalValue === 'false');
+
+      const hasTrueLiteral = type.unionTypes.some(type => type.kind === 'literal' && type.literalValue === 'true');
+
+      let hasBoolean = hasFalseLiteral && hasTrueLiteral;
+
+      let unionTypesLiteralBoolFiltered =
+        type.unionTypes.filter(field => !(field.kind === 'literal' && (field.literalValue === 'false' || field.literalValue === 'true')));
+
+      const optional =
+        unionTypesLiteralBoolFiltered.find((field) => field.kind  === 'literal')?.optional;
+
+      unionTypesLiteralBoolFiltered.push({kind: "boolean", optional: optional ?? false})
+
+      const newUnionTypes = hasBoolean ? unionTypesLiteralBoolFiltered : type.unionTypes;
+
+      for (const t of newUnionTypes) {
         if (t.kind === "literal") {
           const name = t.literalValue;
           if (!name) {
@@ -348,6 +389,7 @@ export function fromTsTypeInternal(type: TsType, scope: Option.Option<TypeMappin
           if (isNumberString(name)) {
             return Either.left("Literals of number type are not supported");
           }
+
           possibleTypes.push({
             name: trimQuotes(name),
           });
@@ -513,7 +555,7 @@ export function fromTsTypeInternal(type: TsType, scope: Option.Option<TypeMappin
       const literalName = type.literalValue;
 
       if (!literalName) {
-        return Either.left(`Unable to determine the literal value. ${JSON.stringify(type)}`);
+        return Either.left(`Internal error: failed to retrieve the literal value from ${JSON.stringify(type)}`);
       }
 
       if (literalName === 'true' || literalName === 'false') {
@@ -615,6 +657,68 @@ function includesUndefined(
   return unionTypes.some((ut) => ut.kind === "undefined" || ut.kind === "null" || ut.kind === "void");
 }
 
+//  { tag: 'a', val: string }
+//  is { tagLiteral: 'a', valueType: Option.some(['val', string]) }
+export type TaggedTypeMetadata = {
+  tagLiteralName: string
+  valueType: Option.Option<[string, TsType]>,
+}
+
+export function getTaggedUnions(
+  unionTypes: TsType[]
+): Option.Option<TaggedTypeMetadata[]> {
+
+  const taggedTypes: TaggedTypeMetadata[] = [];
+
+  for (const ut of unionTypes) {
+    if (ut.kind === "object") {
+
+      if (ut.properties.length > 2) {
+        return Option.none();
+      }
+
+      const tag =
+        ut.properties.find((type) => type.getName() === "tag");
+
+      if (!tag) {
+        return Option.none();
+      }
+
+      const tagType =
+        tag.getTypeAtLocation(tag.getValueDeclarationOrThrow());
+
+      if (tagType.kind !== "literal" || !tagType.literalValue) {
+        return Option.none();
+      }
+
+      const tagValue = tagType.literalValue;
+
+      const name = trimQuotes(tagValue);
+
+
+      const nextSymbol =
+        ut.properties.find((type) => type.getName() !== "tag");
+
+      if (!nextSymbol){
+        taggedTypes.push({
+          tagLiteralName: name,
+          valueType: Option.none()
+        });
+      } else {
+        const propType = nextSymbol.getTypeAtLocation(nextSymbol.getValueDeclarationOrThrow());
+        taggedTypes.push({
+          tagLiteralName: name,
+          valueType: Option.some([nextSymbol.getName(), propType])
+        });
+      }
+    } else {
+      return Option.none()
+    }
+  }
+
+  return Option.some(taggedTypes)
+}
+
 function filterUndefinedTypes(
   scope: Option.Option<TypeMappingScope>,
   unionTypeName: string | undefined,
@@ -664,9 +768,13 @@ function trimQuotes(s: string): string {
   return s;
 }
 
-function convertTypeNameToKebab(methodName: string | undefined): string | undefined{
-  return methodName  ? methodName
+function convertTypeNameToKebab(typeName: string | undefined): string | undefined{
+  return typeName  ? typeName
     .replace(/([a-z])([A-Z])/g, '$1-$2')
     .replace(/[\s_]+/g, '-')
     .toLowerCase() : undefined;
+}
+
+function isKebabCase(str: string): boolean {
+  return /^[a-z]+(-[a-z]+)*$/.test(str);
 }

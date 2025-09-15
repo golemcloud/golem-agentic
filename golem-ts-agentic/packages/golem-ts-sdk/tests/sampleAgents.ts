@@ -22,8 +22,9 @@ import {
   ObjectWithUnionWithUndefined2,
   ObjectWithUnionWithUndefined3,
   ObjectWithUnionWithUndefined4,
-  UnionOfLiterals,
+  UnionWithLiterals,
   UnionType,
+  TaggedUnion,
 } from './testTypes';
 
 @agent()
@@ -75,8 +76,17 @@ class SimpleAgent extends BaseAgent {
       param6: param6,
       param7: param7,
     };
+
     return Promise.resolve(concatenatedResult);
   };
+
+  async fun8(a: UnionWithLiterals): Promise<UnionWithLiterals> {
+    return a;
+  }
+
+  async fun9(param: TaggedUnion): Promise<TaggedUnion> {
+    return param;
+  }
 }
 
 export interface CustomData {
@@ -109,7 +119,7 @@ class ComplexAgent extends BaseAgent {
     tupleType: Types.TupleType,
     listComplexType: Types.ListComplexType,
     objectType: Types.ObjectType,
-    UnionOfLiterals: UnionOfLiterals,
+    unionWithLiterals: UnionWithLiterals,
     textType: UnstructuredText,
     eitherXType: EitherX,
     eitherYType: EitherY,
@@ -121,6 +131,7 @@ class ComplexAgent extends BaseAgent {
     objectWithUnionWithUndefined4: ObjectWithUnionWithUndefined4,
     optionalStringType: string | undefined,
     optionalUnionType: UnionType | undefined,
+    taggedUnionType: TaggedUnion,
   ): Types.PromiseType {
     return Promise.resolve(`Weather for ${location} is sunny!`);
   }
@@ -169,7 +180,7 @@ class ComplexAgent extends BaseAgent {
     throw new Error('Unimplemented');
   }
 
-  async fun14(text: string): Promise<Types.UnionOfLiterals> {
+  async fun14(text: string): Promise<Types.UnionWithLiterals> {
     throw new Error('Unimplemented');
   }
 

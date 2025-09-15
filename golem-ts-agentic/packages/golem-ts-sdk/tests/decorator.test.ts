@@ -79,8 +79,67 @@ describe('Agent decorator should register the agent class and its methods into A
     });
   });
 
+  it('should handle tagged unions in method', () => {
+    const wit = getWitType(complexAgentMethod!.inputSchema, 'taggedUnionType');
+
+    const expectedWit = {
+      nodes: [
+        {
+          name: 'tagged-union',
+          type: {
+            tag: 'variant-type',
+            val: [
+              ['a', 1],
+              ['b', 2],
+              ['c', 3],
+              ['c', 4],
+              ['d', 5],
+              ['e', 6],
+              ['f', 7],
+              ['g', 8],
+            ],
+          },
+        },
+        { type: { tag: 'prim-string-type' } },
+        { type: { tag: 'prim-s32-type' } },
+        { type: { tag: 'prim-bool-type' } },
+        {
+          name: 'union-type',
+          type: {
+            tag: 'variant-type',
+            val: [
+              ['case1', 1],
+              ['case2', 2],
+              ['case3', 5],
+              ['case4', 3],
+            ],
+          },
+        },
+        {
+          name: 'object-type',
+          type: {
+            tag: 'record-type',
+            val: [
+              ['a', 1],
+              ['b', 2],
+              ['c', 3],
+            ],
+          },
+        },
+        { name: 'list-type', type: { tag: 'list-type', val: 1 } },
+        { name: 'tuple-type', type: { tag: 'tuple-type', val: [1, 2, 3] } },
+        {
+          name: 'simple-interface-type',
+          type: { tag: 'record-type', val: [['n', 2]] },
+        },
+      ],
+    };
+
+    expect(wit).toEqual(expectedWit);
+  });
+
   it('should handle union with null in constructor', () => {
-    const optionalUnion = getWitType(
+    const wit = getWitType(
       complexAgentConstructor.inputSchema,
       'optionalUnionType',
     );
@@ -101,7 +160,6 @@ describe('Agent decorator should register the agent class and its methods into A
         },
         { type: { tag: 'prim-string-type' } },
         { type: { tag: 'prim-s32-type' } },
-        { type: { tag: 'prim-bool-type' } },
         {
           name: 'object-type',
           type: {
@@ -109,23 +167,24 @@ describe('Agent decorator should register the agent class and its methods into A
             val: [
               ['a', 2],
               ['b', 3],
-              ['c', 4],
+              ['c', 5],
             ],
           },
         },
+        { type: { tag: 'prim-bool-type' } },
       ],
     };
 
-    expect(optionalUnion).toEqual(expectedWit);
+    expect(wit).toEqual(expectedWit);
   });
 
   it('should handle optional union in method', () => {
-    const optionalUnion = getWitType(
+    const wit = getWitType(
       complexAgentMethod!.inputSchema,
       'optionalUnionType',
     );
 
-    const expected = {
+    const expectedWit = {
       nodes: [
         { type: { tag: 'option-type', val: 1 } },
         {
@@ -141,7 +200,6 @@ describe('Agent decorator should register the agent class and its methods into A
         },
         { type: { tag: 'prim-string-type' } },
         { type: { tag: 'prim-s32-type' } },
-        { type: { tag: 'prim-bool-type' } },
         {
           name: 'object-type',
           type: {
@@ -149,14 +207,15 @@ describe('Agent decorator should register the agent class and its methods into A
             val: [
               ['a', 2],
               ['b', 3],
-              ['c', 4],
+              ['c', 5],
             ],
           },
         },
+        { type: { tag: 'prim-bool-type' } },
       ],
     };
 
-    expect(optionalUnion).toEqual(expected);
+    expect(wit).toEqual(expectedWit);
   });
 
   it('union with null works', () => {
@@ -286,15 +345,15 @@ describe('Agent decorator should register the agent class and its methods into A
   });
 
   it('captures all methods and constructor with correct number of parameters', () => {
-    const weatherAgent = Option.getOrThrowWith(
+    const simpleAgent = Option.getOrThrowWith(
       AgentTypeRegistry.lookup(SimpleAgentClassName),
       () => new Error('WeatherAgent not found in AgentTypeRegistry'),
     );
 
     expect(complexAgent.methods.length).toEqual(22);
     expect(complexAgent.constructor.inputSchema.val.length).toEqual(3);
-    expect(weatherAgent.methods.length).toEqual(7);
-    expect(weatherAgent.constructor.inputSchema.val.length).toEqual(1);
+    expect(simpleAgent.methods.length).toEqual(9);
+    expect(simpleAgent.constructor.inputSchema.val.length).toEqual(1);
   });
 });
 

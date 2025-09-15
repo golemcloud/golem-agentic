@@ -35,7 +35,9 @@ import {
   objectWithUnionWithUndefined4Arb,
   stringOrNumberOrNull,
   stringOrUndefined,
+  taggedUnionArb,
   unionArb,
+  unionOfLiteralArb,
 } from './arbitraries';
 import { ResolvedAgent } from '../src/internal/resolvedAgent';
 import * as Value from '../src/internal/mapping/values/Value';
@@ -53,6 +55,8 @@ test('SimpleAgent can be successfully initiated and all of its methods can be in
       objectWithUnionWithUndefined4Arb,
       stringOrUndefined,
       fc.oneof(unionArb, fc.constant(undefined)),
+      unionOfLiteralArb,
+      taggedUnionArb,
       (
         arbString,
         number,
@@ -63,6 +67,8 @@ test('SimpleAgent can be successfully initiated and all of its methods can be in
         objectWithUnionWithUndefined4,
         stringOrUndefined,
         unionOrUndefined,
+        unionWithLiterals,
+        taggedUnion,
       ) => {
         overrideSelfMetadataImpl(SimpleAgentName.value);
 
@@ -168,6 +174,22 @@ test('SimpleAgent can be successfully initiated and all of its methods can be in
             param6: stringOrUndefined,
             param7: unionOrUndefined,
           },
+        );
+
+        testInvoke(
+          typeRegistry,
+          'fun8',
+          [['a', unionWithLiterals]],
+          resolvedAgent,
+          unionWithLiterals,
+        );
+
+        testInvoke(
+          typeRegistry,
+          'fun9',
+          [['param', taggedUnion]],
+          resolvedAgent,
+          taggedUnion,
         );
       },
     ),
@@ -329,6 +351,8 @@ function testInvoke(
     );
   });
 
+  //  expect(1).toEqual(1);
+
   const dataValues: DataValue = {
     tag: 'tuple',
     val: witValues.map((witValue) => ({
@@ -342,7 +366,9 @@ function testInvoke(
       invokeResult.tag === 'ok'
         ? invokeResult.val
         : (() => {
-            throw new Error('Failed to convert method arg to WitValue. ');
+            throw new Error(
+              `Failed to convert method arg to WitValue. ${JSON.stringify(invokeResult.val)}`,
+            );
           })();
     const witValue = getWitValueFromDataValue(invokeDataValue)[0];
     const result = WitValue.toTsValue(witValue, returnTypeInfo);
