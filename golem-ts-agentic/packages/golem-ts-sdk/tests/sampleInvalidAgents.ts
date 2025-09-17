@@ -42,9 +42,10 @@ class InvalidAgent extends BaseAgent {
     voidParam: void,
     undefined: undefined,
     nullParam: null,
-    unionWithNull: string | number | null,
-    unionWithUndefined: string | number | undefined,
-    unionWithVoid: string | number | void,
+    unionWithKeyWord: 'foo' | 'bar' | 'ok',
+    taggedUnionWithKeyWord:
+      | { tag: 'ok'; val: number }
+      | { tag: 'err'; val: string },
   ): Types.PromiseType {
     return Promise.resolve(`Weather is sunny!`);
   }
