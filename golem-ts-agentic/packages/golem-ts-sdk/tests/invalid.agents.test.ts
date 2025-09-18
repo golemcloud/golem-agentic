@@ -60,9 +60,11 @@ describe('Invalid types in agents', () => {
 
     const unionWithKeyWord = getAnalysedTypeInFun1('unionWithKeyWord');
 
-    const taggedUnionWithKeyWord = getAnalysedTypeInFun1(
-      'taggedUnionWithKeyWord',
-    );
+    const resultTypeInvalid1 = getAnalysedTypeInFun1('resultTypeInvalid1');
+
+    const resultTypeInvalid2 = getAnalysedTypeInFun1('resultTypeInvalid2');
+
+    const resultTypeInvalid3 = getAnalysedTypeInFun1('resultTypeInvalid3');
 
     expect(dateType.val).toBe(
       'Unsupported type `Date`. Use a `string` if possible',
@@ -128,8 +130,16 @@ describe('Invalid types in agents', () => {
       '`ok` is a reserved keyword. The following keywords cannot be used as literals: ok, err, none, some',
     );
 
-    expect(taggedUnionWithKeyWord.val).toBe(
-      '`ok` is a reserved keyword. The following keywords cannot be used as tag values: ok, err, none, some',
+    expect(resultTypeInvalid1.val).toBe(
+      "The value corresponding to the tag 'ok'  cannot be optional. Avoid using the tag names `ok`, `err`. Alternatively, make the value type non optional",
+    );
+
+    expect(resultTypeInvalid2.val).toBe(
+      "The value corresponding to the tag 'err' cannot be optional. Avoid using the tag names `ok , `err`. Alternatively,  make the value type non optional",
+    );
+
+    expect(resultTypeInvalid3.val).toBe(
+      "The value corresponding to the tag 'ok'  cannot be optional. Avoid using the tag names `ok`, `err`. Alternatively, make the value type non optional",
     );
   });
 

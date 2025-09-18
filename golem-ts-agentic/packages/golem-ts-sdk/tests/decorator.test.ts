@@ -158,6 +158,63 @@ describe('Agent decorator should register the agent class and its methods into A
     expect(wit).toEqual(expectedWit);
   });
 
+  it('should handle result type - exact in method', () => {
+    const wit = getWitType(complexAgentMethod!.inputSchema, 'resultTypeExact');
+
+    const expectedWit = {
+      nodes: [
+        {
+          name: 'result-type-exact-both',
+          type: { tag: 'result-type', val: [1, 2] },
+        },
+        { type: { tag: 'prim-f64-type' } },
+        { type: { tag: 'prim-string-type' } },
+      ],
+    };
+
+    expect(wit).toEqual(expectedWit);
+  });
+
+  it('should handle result type with different key names', () => {
+    const wit = getWitType(
+      complexAgentMethod!.inputSchema,
+      'resultTypeNonExact',
+    );
+
+    const expectedWit = {
+      nodes: [
+        {
+          name: 'result-type-non-exact',
+          type: { tag: 'result-type', val: [1, 2] },
+        },
+        { type: { tag: 'prim-f64-type' } },
+        { type: { tag: 'prim-string-type' } },
+      ],
+    };
+
+    expect(wit).toEqual(expectedWit);
+  });
+
+  it('should handle result type with different key names for ok and err', () => {
+    const wit = getWitType(
+      complexAgentMethod!.inputSchema,
+      'resultTypeNonExact2',
+    );
+
+    const expectedWit = {
+      nodes: [
+        {
+          name: 'result-type-non-exact2',
+          type: { tag: 'result-type', val: [1, 2] },
+        },
+        { type: { tag: 'prim-f64-type' } },
+        { type: { tag: 'prim-string-type' } },
+      ],
+    };
+
+    expect(wit).toEqual(expectedWit);
+  });
+
   it('should handle union with null in constructor', () => {
     const wit = getWitType(
       complexAgentConstructor.inputSchema,
@@ -372,7 +429,7 @@ describe('Agent decorator should register the agent class and its methods into A
 
     expect(complexAgent.methods.length).toEqual(22);
     expect(complexAgent.constructor.inputSchema.val.length).toEqual(3);
-    expect(simpleAgent.methods.length).toEqual(10);
+    expect(simpleAgent.methods.length).toEqual(13);
     expect(simpleAgent.constructor.inputSchema.val.length).toEqual(1);
   });
 });

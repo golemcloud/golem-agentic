@@ -32,6 +32,12 @@ import {
   UnionType,
   TaggedUnion,
   UnionWithOnlyLiterals,
+  ResultTypeExactBoth,
+  ResultTypeNonExact,
+  ResultTypeNonExact2,
+  ResultTypeInvalid1,
+  ResultTypeInvalid2,
+  ResultTypeInvalid3,
 } from './testTypes';
 
 import { AgentClassName } from '../src';
@@ -71,39 +77,73 @@ export const objectWithUnionWithUndefined4Arb: Arbitrary<ObjectWithUnionWithUnde
 export const unionOfLiteralArb: Arbitrary<UnionWithLiterals> =
   fc.constantFrom<UnionWithLiterals>('a', 'b', 'c', true, false);
 
+export const resultTypeExactArb: Arbitrary<ResultTypeExactBoth> = fc.oneof(
+  fc.record({ tag: fc.constant('ok'), val: fc.integer() }),
+  fc.record({ tag: fc.constant('err'), val: fc.string() }),
+);
+
+export const resultTypeNonExactArb: Arbitrary<ResultTypeNonExact> = fc.oneof(
+  fc.record({ tag: fc.constant('ok'), value: fc.integer() }),
+  fc.record({ tag: fc.constant('err'), value: fc.string() }),
+);
+
+export const resultTypeNonExact2Arb: Arbitrary<ResultTypeNonExact2> = fc.oneof(
+  fc.record({ tag: fc.constant('ok'), okValue: fc.integer() }),
+  fc.record({ tag: fc.constant('err'), errValue: fc.string() }),
+);
+
+export const resultTypeNonExact3Arb: Arbitrary<ResultTypeInvalid1> = fc.oneof(
+  fc.record({ tag: fc.constant('ok'), okVal: fc.integer() }),
+  fc.record({ tag: fc.constant('ok') }),
+  fc.record({ tag: fc.constant('err'), errVal: fc.string() }),
+);
+
+export const resultTypeNonExact4Arb: Arbitrary<ResultTypeInvalid2> = fc.oneof(
+  fc.record({ tag: fc.constant('ok'), okVal: fc.integer() }),
+  fc.record({ tag: fc.constant('err'), errVal: fc.string() }),
+  fc.record({ tag: fc.constant('err') }),
+);
+
+export const resultTypeNonExact5Arb: Arbitrary<ResultTypeInvalid3> = fc.oneof(
+  fc.record({ tag: fc.constant('ok'), okVal: fc.integer() }),
+  fc.record({ tag: fc.constant('ok') }),
+  fc.record({ tag: fc.constant('err'), errVal: fc.string() }),
+  fc.record({ tag: fc.constant('err') }),
+);
+
 export const taggedUnionArb: Arbitrary<TaggedUnion> = fc.oneof(
-  // fc.record({ tag: fc.constant('a'), val: fc.string() }),
-  // fc.record({ tag: fc.constant('b'), val: fc.integer() }),
-  // fc.record({ tag: fc.constant('c'), val: fc.boolean() }),
-  // fc.record({
-  //   tag: fc.constant('d'),
-  //   val: fc.oneof(
-  //     fc.integer(),
-  //     fc.string(),
-  //     fc.boolean(),
-  //     fc.record({
-  //       a: fc.string(),
-  //       b: fc.integer(),
-  //       c: fc.boolean(),
-  //     }),
-  //   ),
-  // }),
-  // fc.record({
-  //   tag: fc.constant('e'),
-  //   val: fc.record({
-  //     a: fc.string(),
-  //     b: fc.integer(),
-  //     c: fc.boolean(),
-  //   }),
-  // }),
-  // fc.record({
-  //   tag: fc.constant('f'),
-  //   val: fc.array(fc.string()),
-  // }),
-  // fc.record({
-  //   tag: fc.constant('g'),
-  //   val: fc.tuple(fc.string(), fc.integer(), fc.boolean()),
-  // }),
+  fc.record({ tag: fc.constant('a'), val: fc.string() }),
+  fc.record({ tag: fc.constant('b'), val: fc.integer() }),
+  fc.record({ tag: fc.constant('c'), val: fc.boolean() }),
+  fc.record({
+    tag: fc.constant('d'),
+    val: fc.oneof(
+      fc.integer(),
+      fc.string(),
+      fc.boolean(),
+      fc.record({
+        a: fc.string(),
+        b: fc.integer(),
+        c: fc.boolean(),
+      }),
+    ),
+  }),
+  fc.record({
+    tag: fc.constant('e'),
+    val: fc.record({
+      a: fc.string(),
+      b: fc.integer(),
+      c: fc.boolean(),
+    }),
+  }),
+  fc.record({
+    tag: fc.constant('f'),
+    val: fc.array(fc.string()),
+  }),
+  fc.record({
+    tag: fc.constant('g'),
+    val: fc.tuple(fc.string(), fc.integer(), fc.boolean()),
+  }),
   fc.record({
     tag: fc.constant('i'),
   }),

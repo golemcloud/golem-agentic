@@ -33,6 +33,12 @@ import {
   objectWithUnionWithUndefined2Arb,
   objectWithUnionWithUndefined3Arb,
   objectWithUnionWithUndefined4Arb,
+  resultTypeExactArb,
+  resultTypeNonExact2Arb,
+  resultTypeNonExact3Arb,
+  resultTypeNonExact4Arb,
+  resultTypeNonExact5Arb,
+  resultTypeNonExactArb,
   stringOrNumberOrNull,
   stringOrUndefined,
   taggedUnionArb,
@@ -43,6 +49,8 @@ import {
 import { ResolvedAgent } from '../src/internal/resolvedAgent';
 import * as Value from '../src/internal/mapping/values/Value';
 import { DataValue } from 'golem:agent/common';
+import { TsType } from '../src/internal/mapping/types/taggedUnion';
+import * as util from 'node:util';
 
 test('SimpleAgent can be successfully initiated and all of its methods can be invoked', () => {
   fc.assert(
@@ -59,6 +67,9 @@ test('SimpleAgent can be successfully initiated and all of its methods can be in
       unionOfLiteralArb,
       taggedUnionArb,
       unionWithOnlyLiteralsArb,
+      resultTypeExactArb,
+      resultTypeNonExactArb,
+      resultTypeNonExact2Arb,
       (
         arbString,
         number,
@@ -72,6 +83,9 @@ test('SimpleAgent can be successfully initiated and all of its methods can be in
         unionWithLiterals,
         taggedUnion,
         unionWithOnlyLiterals,
+        resultTypeExactBoth,
+        resultTypeNonExact,
+        resultTypeNonExact2,
       ) => {
         overrideSelfMetadataImpl(SimpleAgentName.value);
 
@@ -202,6 +216,30 @@ test('SimpleAgent can be successfully initiated and all of its methods can be in
           resolvedAgent,
           unionWithOnlyLiterals,
         );
+
+        testInvoke(
+          typeRegistry,
+          'fun11',
+          [['param', resultTypeExactBoth]],
+          resolvedAgent,
+          resultTypeExactBoth,
+        );
+
+        testInvoke(
+          typeRegistry,
+          'fun12',
+          [['param', resultTypeNonExact]],
+          resolvedAgent,
+          resultTypeNonExact,
+        );
+
+        testInvoke(
+          typeRegistry,
+          'fun13',
+          [['param', resultTypeNonExact2]],
+          resolvedAgent,
+          resultTypeNonExact2,
+        );
       },
     ),
   );
@@ -233,21 +271,19 @@ test('ComplexAgent can be successfully initiated', () => {
 
         const interfaceWit = Either.getOrThrowWith(
           WitValue.fromTsValue(interfaceValue, arg0),
-          (error) =>
-            new Error(`Failed to convert interface to WitValue. ${error}`),
+          (error) => new Error(error),
         );
 
         const optionalStringWit = Either.getOrThrowWith(
           WitValue.fromTsValue(stringValue, arg1),
-          (error) =>
-            new Error(`Failed to convert interface to WitValue. ${error}`),
+          (error) => new Error(error),
         );
 
         expect(Value.fromWitValue(optionalStringWit).kind).toEqual('option');
 
         const optionalUnionWit = Either.getOrThrowWith(
           WitValue.fromTsValue(unionValue, arg2),
-          (error) => new Error(`Failed to convert union to WitValue. ${error}`),
+          (error) => new Error(error),
         );
 
         expect(Value.fromWitValue(optionalUnionWit).kind).toEqual('option');
@@ -294,8 +330,7 @@ function initiateSimpleAgent(
 
   const witValue = Either.getOrThrowWith(
     WitValue.fromTsValue(constructorParamString, constructorInfo),
-    (error) =>
-      new Error(`Failed to convert constructor arg to WitValue. ${error}`),
+    (error) => new Error(error),
   );
 
   const constructorParams: DataValue = {
@@ -345,7 +380,7 @@ function testInvoke(
   }
 
   const witValues = parameterName.map(([paramName, value]) => {
-    const paramType = parametersInfo.get(paramName);
+    const paramType: TsType | undefined = parametersInfo.get(paramName);
 
     if (!paramType) {
       throw new Error(
@@ -353,13 +388,12 @@ function testInvoke(
       );
     }
 
-    return Either.getOrThrowWith(
+    const r = Either.getOrThrowWith(
       WitValue.fromTsValue(value, paramType),
-      (error) =>
-        new Error(
-          `Failed to convert parameter ${paramName} to WitValue. ${error}`,
-        ),
+      (error) => new Error(error),
     );
+
+    return r;
   });
 
   const dataValues: DataValue = {
@@ -375,9 +409,7 @@ function testInvoke(
       invokeResult.tag === 'ok'
         ? invokeResult.val
         : (() => {
-            throw new Error(
-              `Failed to convert method arg to WitValue. ${JSON.stringify(invokeResult.val)}`,
-            );
+            throw new Error(util.format(invokeResult.val));
           })();
     const witValue = getWitValueFromDataValue(invokeDataValue)[0];
     const result = WitValue.toTsValue(witValue, returnTypeInfo);
