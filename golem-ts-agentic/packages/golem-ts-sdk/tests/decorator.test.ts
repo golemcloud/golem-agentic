@@ -24,7 +24,7 @@ import * as util from 'node:util';
 describe('Agent decorator should register the agent class and its methods into AgentTypeRegistry', () => {
   const complexAgent: AgentType = Option.getOrThrowWith(
     AgentTypeRegistry.lookup(ComplexAgentClassName),
-    () => new Error('AssistantAgent not found in AgentTypeRegistry'),
+    () => new Error('ComplexAgent not found in AgentTypeRegistry'),
   );
 
   const complexAgentConstructor = complexAgent.constructor;
@@ -424,13 +424,33 @@ describe('Agent decorator should register the agent class and its methods into A
   it('captures all methods and constructor with correct number of parameters', () => {
     const simpleAgent = Option.getOrThrowWith(
       AgentTypeRegistry.lookup(SimpleAgentClassName),
-      () => new Error('WeatherAgent not found in AgentTypeRegistry'),
+      () => new Error('SimpleAgent not found in AgentTypeRegistry'),
     );
 
     expect(complexAgent.methods.length).toEqual(22);
     expect(complexAgent.constructor.inputSchema.val.length).toEqual(3);
     expect(simpleAgent.methods.length).toEqual(13);
     expect(simpleAgent.constructor.inputSchema.val.length).toEqual(1);
+  });
+
+  it('should not capture overridden functions in base agents as agent methods', () => {
+    const simpleAgent = Option.getOrThrowWith(
+      AgentTypeRegistry.lookup(SimpleAgentClassName),
+      () => new Error('SimpleAgent not found in AgentTypeRegistry'),
+    );
+
+    const forbidden = [
+      'get-id',
+      'get-agent-type',
+      'load-snapshot',
+      'save-snapshot',
+    ];
+
+    [complexAgent, simpleAgent].forEach((agent) => {
+      forbidden.forEach((name) => {
+        expect(agent.methods.find((m) => m.name === name)).toBeUndefined();
+      });
+    });
   });
 });
 

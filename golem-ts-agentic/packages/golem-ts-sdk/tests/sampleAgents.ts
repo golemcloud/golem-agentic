@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { agent, BaseAgent, UnstructuredText } from '../src';
+import { agent, AgentId, BaseAgent, UnstructuredText } from '../src';
 import * as Types from './testTypes';
 import {
   EitherX,
@@ -107,6 +107,22 @@ class SimpleAgent extends BaseAgent {
   async fun13(param: ResultTypeNonExact2): Promise<ResultTypeNonExact2> {
     return param;
   }
+
+  // Overridden methods should be  not be considered as agent methods
+  // without override keyword
+  loadSnapshot(bytes: Uint8Array): Promise<void> {
+    return super.loadSnapshot(bytes);
+  }
+
+  // With override keyword
+  override async saveSnapshot(): Promise<Uint8Array> {
+    return super.saveSnapshot();
+  }
+
+  // Without override keyword, and existing as an arrow function
+  getId = () => {
+    return super.getId();
+  };
 }
 
 export interface CustomData {
