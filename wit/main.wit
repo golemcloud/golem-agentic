@@ -44,6 +44,8 @@ world agent-guest {
   import wasi:keyvalue/types@0.1.0;
   import wasi:keyvalue/wasi-keyvalue-error@0.1.0;
 
+  import wasi:config/store@0.2.0-draft;
+
   include golem:agent/agent-guest;
 
   export golem:api/save-snapshot@1.1.7;
