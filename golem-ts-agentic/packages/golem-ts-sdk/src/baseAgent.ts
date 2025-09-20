@@ -17,6 +17,7 @@ import { AgentId } from './agentId';
 import { AgentTypeRegistry } from './internal/registry/agentTypeRegistry';
 import * as Option from './newTypes/option';
 import { AgentClassName } from './newTypes/agentClassName';
+import { Datetime } from 'golem:rpc/types@0.2.2';
 
 /**
  * BaseAgent is the foundational class for defining agent implementations.
@@ -104,7 +105,19 @@ export class BaseAgent {
   static get<T extends new (...args: any[]) => BaseAgent>(
     this: T,
     ...args: ConstructorParameters<T>
-  ): InstanceType<T> {
+  ): WithRemoteMethods<InstanceType<T>> {
     throw new Error('A remote client will be created at runtime');
   }
 }
+
+export type WithRemoteMethods<T> = {
+  [K in keyof T]: T[K] extends (...args: infer A) => infer R
+    ? RemoteMethod<A, Awaited<R>>
+    : T[K];
+};
+
+export type RemoteMethod<Args extends any[], R> = {
+  (...args: Args): Promise<R>;
+  trigger: (...args: Args) => Promise<R>;
+  schedule: (ts: Datetime, ...args: Args) => Promise<R>;
+};

@@ -12,13 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {
-  agent,
-  AgentId,
-  BaseAgent,
-  UnstructuredBinary,
-  UnstructuredText,
-} from '../src';
+import { agent, BaseAgent, UnstructuredBinary, UnstructuredText } from '../src';
 import * as Types from './testTypes';
 import {
   EitherX,
@@ -116,6 +110,34 @@ class SimpleAgent extends BaseAgent {
     return param;
   }
 
+  // Ensuring remote call variants compiles
+  async fun14(
+    testInterfaceType: Types.TestInterfaceType,
+    optionalStringType: string | null,
+    optionalUnionType: UnionType | null,
+    unstructuredText: UnstructuredText,
+    unstructuredBinary: UnstructuredBinary,
+  ): Promise<void> {
+    const remoteClient = ComplexAgent.get(
+      testInterfaceType,
+      optionalStringType,
+      optionalUnionType,
+      unstructuredText,
+      unstructuredText,
+      unstructuredBinary,
+      unstructuredBinary,
+    );
+
+    await remoteClient.fun2('foo');
+
+    await remoteClient.fun2.trigger('foo');
+
+    await remoteClient.fun2.schedule(
+      { seconds: 50000n, nanoseconds: 0 },
+      'foo',
+    );
+  }
+
   // Overridden methods should be  not be considered as agent methods
   // without override keyword
   loadSnapshot(bytes: Uint8Array): Promise<void> {
@@ -138,7 +160,7 @@ export interface CustomData {
   value: number;
 }
 
-@agent()
+@agent('my-complex-agent')
 class ComplexAgent extends BaseAgent {
   constructor(
     readonly testInterfaceType: Types.TestInterfaceType,
