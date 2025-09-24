@@ -218,30 +218,42 @@ interface lip-sync {
 interface advanced {
   use types.{video-error, kv, base-video, generation-config, input-image, effect-type};
 
-  extend-video: func(
+  record extend-video-options {
     video-id: string,
     prompt: option<string>,
     negative-prompt: option<string>,
     cfg-scale: option<f32>,
     provider-options: option<list<kv>>,
+  }
+  
+  extend-video: func(
+    options: extend-video-options
   ) -> result<string, video-error>;
 
   upscale-video: func(
     input: base-video,
   ) -> result<string, video-error>;
 
-  generate-video-effects: func(
+  record generate-video-effects-options {
     input: input-image,
     effect: effect-type,
     model: option<string>,
     duration: option<f32>,
     mode: option<string>,
+  }
+  
+  generate-video-effects: func(
+    options: generate-video-effects-options
   ) -> result<string, video-error>;
 
-  multi-image-generation: func(
+  record mult-image-generation-options {
     input-images: list<input-image>,
     prompt: option<string>,
     config: generation-config,
+  }
+  
+  multi-image-generation: func(
+    options: mult-image-generation-options
   ) -> result<string, video-error>;
 }
 

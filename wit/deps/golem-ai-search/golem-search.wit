@@ -99,17 +99,23 @@ interface types {
     fields: list<schema-field>,
     primary-key: option<string>,
   }
+
+  record create-index-options {
+    index-name: string,
+    schema: option<schema>
+  }
 }
 
 /// Unified search interface
 interface core {
   use types.{
     index-name, document-id, doc, search-query, search-results,
-    search-hit, schema, search-error
+    search-hit, schema, search-error,
+    create-index-options
   };
 
   // Index lifecycle
-  create-index: func(name: index-name, schema: option<schema>) -> result<_, search-error>;
+  create-index: func(options: create-index-options) -> result<_, search-error>;
   delete-index: func(name: index-name) -> result<_, search-error>;
   list-indexes: func() -> result<list<index-name>, search-error>;
 

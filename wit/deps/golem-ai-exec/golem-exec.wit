@@ -26,7 +26,7 @@ interface types {
     encoding: option<encoding>, // defaults to utf8
   }
 
-  /// Resource limits and execution constraints
+  /// Resource limits
   record limits {
     time-ms: option<u64>,
     memory-bytes: option<u64>,
@@ -59,30 +59,36 @@ interface types {
     resource-exceeded,
     internal(string),
   }
+
+  /// Options for controlling the script runner environment
+  /// - `stdin` is optional input to provide to the program.
+  /// - `args` are command line arguments passed to the program.
+  /// - `env` is a list of environment variables to set for the execution.
+  /// - `limits` are optional resource limits for the execution.
+  record run-options {
+    stdin: option<string>,
+    args: option<list<string>>,
+    env: option<list<tuple<string, string>>>,
+    limits: option<limits>
+  }
 }
 
 interface executor {
-  use types.{language, file, limits, exec-result, error};
+  use types.{language, file, limits, exec-result, error, run-options};
 
   /// Blocking, non-streaming execution
   ///
   /// - `lang` specifies the programming language and version.
-  /// - `snippet` is the top level code to execute.
   /// - `modules` are additional code files to include in the execution context. these can be imported in `snippet` in a language-specific way.
-  /// - `stdin` is optional input to provide to the program.
-  /// - `args` are command line arguments passed to the program.
-  /// - `env` is a list of environment variables to set for the execution.
-  /// - `constraints` are optional resource limits for the execution.
+  /// - `snippet` is the top level code to execute.
+  /// - `options` is controlling the script runner environment, see the run-options record for more details
   ///
   /// The returned value captures the stdout and stderr of the executed snippet.
   run: func(
     lang: language,
-    snippet: string,
     modules: list<file>,
-    stdin: option<string>,
-    args: list<string>,
-    env: list<tuple<string, string>>,
-    constraints: option<limits>
+    snippet: string,
+    options: run-options,
   ) -> result<exec-result, error>;
 
   /// Session for executing multiple code snippets in it.
@@ -100,18 +106,12 @@ interface executor {
     /// Execute a code snippet in the session in a blocking way
     ///
     /// - `snippet` is the top level code to execute.
-    /// - `args` are command line arguments passed to the program.
-    /// - `stdin` is optional input to provide to the program.
-    /// - `env` is a list of environment variables to set for the execution.
-    /// - `constraints` are optional resource limits for the execution.
+    /// - `options` is controlling the script runner environment, see the run-options record for more details
     ///
     /// The returned value captures the stdout and stderr of the executed snippet.
     run: func(
       snippet: string,
-      args: list<string>,
-      stdin: option<string>,
-      env: list<tuple<string, string>>,
-      constraints: option<limits>
+      options: run-options,
     ) -> result<exec-result, error>;
 
     /// Downloads a data file from the session.
