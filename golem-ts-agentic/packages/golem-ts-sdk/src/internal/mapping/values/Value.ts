@@ -1218,6 +1218,19 @@ function matchesType(value: any, type: Type.Type): boolean {
       return matchesTuple(value, type.elements);
 
     case 'union':
+      const unionOfLiterals = getUnionOfLiterals(type.unionTypes);
+
+      if (Either.isLeft(unionOfLiterals)) {
+        throw new Error(`Internal Error: ${unionOfLiterals.val} `);
+      }
+
+      if (Option.isSome(unionOfLiterals.val)) {
+        return (
+          typeof value === 'string' &&
+          unionOfLiterals.val.val.literals.includes(value.toString())
+        );
+      }
+
       const taggedUnions = getTaggedUnion(type.unionTypes);
 
       if (Either.isLeft(taggedUnions)) {
@@ -1655,6 +1668,19 @@ export function toTsValue(value: Value, type: Type.Type): any {
       }
 
     case 'union':
+      const unionOfLiterals = Either.getOrThrowWith(
+        getUnionOfLiterals(type.unionTypes),
+        (error) => new Error(`Internal Error: ${error}`),
+      );
+
+      if (Option.isSome(unionOfLiterals)) {
+        if (value.kind === 'enum') {
+          return unionOfLiterals.val.literals[value.value];
+        } else {
+          throw new Error(typeMismatchInDeserialize(value, 'enum'));
+        }
+      }
+
       const taggedUnions = Either.getOrThrowWith(
         getTaggedUnion(type.unionTypes),
         (error) => new Error(`Internal Error: ${error}`),
@@ -1673,9 +1699,6 @@ export function toTsValue(value: Value, type: Type.Type): any {
 
       if (value.kind === 'variant') {
         const caseValue = value.caseValue;
-        if (!caseValue) {
-          throw new Error(typeMismatchInDeserialize(value, 'union'));
-        }
 
         if (Option.isSome(taggedUnions)) {
           const tags = TaggedUnion.getTaggedTypes(taggedUnions.val);
@@ -1688,11 +1711,18 @@ export function toTsValue(value: Value, type: Type.Type): any {
             return tagName;
           } else {
             const innerTypeVal = innerType.val;
+            if (!caseValue) {
+              throw new Error(typeMismatchInDeserialize(value, 'union'));
+            }
             return toTsValue(caseValue, innerTypeVal[1]);
           }
         }
 
         const matchingType = filteredUnionTypes[value.caseIdx];
+
+        if (!caseValue) {
+          return matchingType.name;
+        }
 
         return toTsValue(caseValue, matchingType);
       } else if (value.kind === 'result') {
