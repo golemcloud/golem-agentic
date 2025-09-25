@@ -25,6 +25,7 @@ import {
   getPromiseType,
   getUnionWithOnlyLiterals,
   getUnionWithLiterals,
+  getResultTypeExact,
 } from './testUtils';
 
 import { TestInterfaceType } from './testTypes';
@@ -40,6 +41,7 @@ import {
   unionComplexArb,
   unionWithOnlyLiteralsArb,
   unionWithLiteralArb,
+  resultTypeExactArb,
 } from './arbitraries';
 import * as fc from 'fast-check';
 import { Type } from '@golemcloud/golem-ts-types-core';
@@ -131,6 +133,15 @@ describe('typescript value to wit value round-trip conversions', () => {
       fc.property(unionWithLiteralArb, (unionData) => {
         const unionWithLiterals = getUnionWithLiterals();
         runRoundTripTest(unionData, unionWithLiterals);
+      }),
+    );
+  });
+
+  it('should correctly perform round-trip conversion for wit result', () => {
+    fc.assert(
+      fc.property(resultTypeExactArb, (resultValue) => {
+        const resultTypeExact = getResultTypeExact();
+        runRoundTripTest(resultValue, resultTypeExact);
       }),
     );
   });
