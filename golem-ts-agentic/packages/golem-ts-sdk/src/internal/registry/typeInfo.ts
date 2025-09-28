@@ -12,24 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { Type } from '@golemcloud/golem-ts-types-core';
+import { ElementSchema } from 'golem:agent/common';
+import { AnalysedType } from '../mapping/types/AnalysedType';
 
-let variantNameGlobalIdx = 0;
-
-export function generateVariantCaseName(variantName: string | undefined, termIdx: number): string {
-
-  if (!variantName) {
-    variantNameGlobalIdx += 1;
-    return `case${variantNameGlobalIdx}`
-  }
-
-  const kebabCasedVariantName = convertVariantTypeNameToKebab(variantName);
-
-  return `${kebabCasedVariantName}${termIdx}`
-}
-
-function convertVariantTypeNameToKebab(typeName: string): string{
-  return typeName
-    .replace(/([a-z])([A-Z])/g, '$1-$2')
-    .replace(/[\s_]+/g, '-')
-    .toLowerCase();
-}
+export type TypeInfo =
+  | { tag: 'analysed-type'; typeInfo: AnalysedType }
+  | { tag: 'ts-type'; typeInfo: Type.Type }
+  | { tag: 'wit-type'; typeInfo: ElementSchema };

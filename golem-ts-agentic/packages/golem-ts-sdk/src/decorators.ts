@@ -39,6 +39,9 @@ import { AgentMethodParamRegistry } from './internal/registry/agentMethodParamRe
 import { AgentConstructorRegistry } from './internal/registry/agentConstructorRegistry';
 import { UnstructuredText } from './newTypes/textInput';
 import { UnstructuredBinary } from './newTypes/binaryInput';
+import { AnalysedType } from './internal/mapping/types/AnalysedType';
+import * as Value from './internal/mapping/values/Value';
+import * as util from 'node:util';
 
 type TsType = Type.Type;
 
@@ -200,18 +203,34 @@ export function agent(customName?: string) {
 
     AgentTypeRegistry.register(agentClassName, agentType);
 
+    const constructorParamTypes:
+      | [string, Option.Option<AnalysedType>][]
+      | undefined = TypeMetadata.get(agentClassName.value)?.constructorArgs.map(
+      (arg) => {
+        return [
+          arg.name,
+          Option.fromNullable(
+            AgentConstructorParamRegistry.lookupParamType(
+              agentClassName,
+              arg.name,
+            ),
+          ),
+        ];
+      },
+    );
+
+    if (!constructorParamTypes) {
+      throw new Error(
+        `Failed to retrieve constructor parameter types for agent ${agentClassName.value}.`,
+      );
+    }
+
     (ctor as any).get = getRemoteClient(ctor);
 
     AgentInitiatorRegistry.register(agentTypeName, {
-      initiate: (agentName: string, constructorParams: DataValue) => {
-        const constructorInfo = classMetadata.constructorArgs;
-
-        const constructorParamTypes: [string, TsType][] = constructorInfo.map(
-          (p) => [p.name, p.type],
-        );
-
+      initiate: (agentName: string, constructorInput: DataValue) => {
         const deserializedConstructorArgs = deserializeDataValue(
-          constructorParams,
+          constructorInput,
           constructorParamTypes,
         );
 
@@ -242,7 +261,7 @@ export function agent(customName?: string) {
             return uniqueAgentId;
           },
           getParameters(): DataValue {
-            return constructorParams;
+            return constructorInput;
           },
           getAgentType: () => {
             const agentType = AgentTypeRegistry.lookup(agentClassName);
@@ -296,16 +315,42 @@ export function agent(customName?: string) {
               };
             }
 
-            const paramTypes: MethodParams = methodInfo.methodParams;
-
-            const returnType: TsType = methodInfo.returnType;
-
-            const paramTypeArray = Array.from(paramTypes);
-
-            const convertedArgs = deserializeDataValue(
-              methodArgs,
-              paramTypeArray,
+            const returnTypeAnalysed = AgentMethodRegistry.lookupReturnType(
+              agentClassName,
+              methodName,
             );
+
+            const methodParams = TypeMetadata.get(
+              agentClassName.value,
+            )?.methods.get(methodName)?.methodParams;
+
+            if (!methodParams) {
+              const error: AgentError = {
+                tag: 'invalid-method',
+                val: `Failed to retrieve parameter types for method ${methodName} in agent ${agentClassName}.`,
+              };
+              return {
+                tag: 'err',
+                val: error,
+              };
+            }
+
+            const paramTypes = Array.from(methodParams.entries()).map(
+              (param) => {
+                return [
+                  param[0],
+                  Option.fromNullable(
+                    AgentMethodParamRegistry.lookupParamType(
+                      agentClassName,
+                      methodName,
+                      param[0],
+                    ),
+                  ),
+                ] as [string, Option.Option<AnalysedType>];
+              },
+            );
+
+            const convertedArgs = deserializeDataValue(methodArgs, paramTypes);
 
             const result = await fn.apply(instance, convertedArgs);
 
@@ -325,7 +370,22 @@ export function agent(customName?: string) {
               };
             }
 
-            const returnValue = WitValue.fromTsValue(result, returnType);
+            if (!returnTypeAnalysed) {
+              const error: AgentError = {
+                tag: 'invalid-type',
+                val: `Return type of method ${methodName} in agent ${agentClassName} is not supported. Only primitive types, arrays, objects, and tagged unions (Result types) are supported.`,
+              };
+
+              return {
+                tag: 'err',
+                val: error,
+              };
+            }
+
+            const returnValue = WitValue.fromTsValue(
+              result,
+              returnTypeAnalysed,
+            );
 
             if (Either.isLeft(returnValue)) {
               const agentError: AgentError = {
@@ -668,7 +728,7 @@ export function description(description: string) {
 
 export function deserializeDataValue(
   dataValue: DataValue,
-  paramTypes: [string, TsType][],
+  paramTypes: [string, Option.Option<AnalysedType>][],
 ): any[] {
   switch (dataValue.tag) {
     case 'tuple':
@@ -685,15 +745,23 @@ export function deserializeDataValue(
             return UnstructuredBinary.fromDataValue(binaryRef);
 
           case 'component-model':
+            const param = paramTypes[idx][1];
+
+            if (Option.isNone(param)) {
+              throw new Error(
+                `Internal error: Unknown parameter type for ${util.format(Value.fromWitValue(elem.val))} at index ${idx}`,
+              );
+            }
+
             const witValue = elem.val;
-            return WitValue.toTsValue(witValue, paramTypes[idx][1]);
+            return WitValue.toTsValue(witValue, param.val);
         }
       });
 
     case 'multimodal':
       const multiModalElements = dataValue.val;
 
-      return multiModalElements.map(([name, elem], idx) => {
+      return multiModalElements.map(([name, elem]) => {
         switch (elem.tag) {
           case 'unstructured-text':
             const textRef = elem.val;
@@ -710,11 +778,19 @@ export function deserializeDataValue(
 
             if (!param) {
               throw new Error(
-                `Unable to process multimodal input of elem ${elem.val}. Unknown parameter \`${name}\` in multimodal input. Available: ${paramTypes.map((p) => JSON.stringify(p)).join(', ')}`,
+                `Unable to process multimodal input of elem ${util.format(Value.fromWitValue(elem.val))}. Unknown parameter \`${name}\` in multimodal input. Available: ${paramTypes.map((p) => JSON.stringify(p)).join(', ')}`,
               );
             }
 
-            return WitValue.toTsValue(witValue, param[1]);
+            const paramType = param[1];
+
+            if (Option.isNone(paramType)) {
+              throw new Error(
+                `Internal error: Unknown parameter type for multimodal input ${util.format(Value.fromWitValue(elem.val))} with name ${name}`,
+              );
+            }
+
+            return WitValue.toTsValue(witValue, paramType.val);
         }
       });
   }

@@ -15,13 +15,7 @@
 import { Type } from '@golemcloud/golem-ts-types-core';
 import * as Either from '../newTypes/either';
 import * as Option from '../newTypes/option';
-import {
-  AgentMethod,
-  DataSchema,
-  ElementSchema,
-  TextDescriptor,
-  TextType,
-} from 'golem:agent/common';
+import { AgentMethod, DataSchema, ElementSchema } from 'golem:agent/common';
 import * as WitType from './mapping/types/WitType';
 import { AgentClassName } from '../newTypes/agentClassName';
 import { AgentMethodRegistry } from './registry/agentMethodRegistry';
@@ -31,10 +25,10 @@ import {
   MethodParams,
 } from '@golemcloud/golem-ts-types-core';
 import { TypeMappingScope } from './mapping/types/scope';
-import { languageCodes } from '../decorators';
 import { AgentConstructorParamRegistry } from './registry/agentConstructorParamRegistry';
 import { AgentMethodParamRegistry } from './registry/agentMethodParamRegistry';
 import { AgentConstructorRegistry } from './registry/agentConstructorRegistry';
+import { AnalysedType, tuple } from './mapping/types/AnalysedType';
 
 export function getConstructorDataSchema(
   agentClassName: AgentClassName,
@@ -53,6 +47,11 @@ export function getConstructorDataSchema(
       const paramTypeName = paramType.name;
 
       if (paramTypeName && paramTypeName === 'UnstructuredText') {
+        AgentConstructorParamRegistry.setIfNotExists(
+          agentClassName,
+          paramInfo.name,
+        );
+
         const metadata = AgentConstructorParamRegistry.lookup(agentClassName);
 
         const languageCodes = metadata?.get(paramInfo.name)?.languageCodes;
@@ -74,6 +73,11 @@ export function getConstructorDataSchema(
       }
 
       if (paramTypeName && paramTypeName === 'UnstructuredBinary') {
+        AgentConstructorParamRegistry.setIfNotExists(
+          agentClassName,
+          paramInfo.name,
+        );
+
         const metadata = AgentConstructorParamRegistry.lookup(agentClassName);
 
         const mimeTypes = metadata?.get(paramInfo.name)?.mimeTypes;
@@ -105,7 +109,16 @@ export function getConstructorDataSchema(
         ),
       );
 
-      return Either.map(witType, (witType) => {
+      return Either.map(witType, (typeInfo) => {
+        const witType = typeInfo[0];
+        const analysedType = typeInfo[1];
+
+        AgentConstructorParamRegistry.setAnalysedType(
+          agentClassName,
+          paramInfo.name,
+          analysedType,
+        );
+
         const elementSchema: ElementSchema = {
           tag: 'component-model',
           val: witType,
@@ -172,7 +185,10 @@ export function getAgentMethodSchema(
 
       const inputSchema = inputSchemaEither.val;
 
-      const outputSchemaEither = buildOutputSchema(returnType);
+      const outputSchemaEither: Either.Either<
+        [AnalysedType, DataSchema],
+        string
+      > = buildOutputSchema(returnType);
 
       if (Either.isLeft(outputSchemaEither)) {
         return Either.left(
@@ -180,7 +196,13 @@ export function getAgentMethodSchema(
         );
       }
 
-      const outputSchema = outputSchemaEither.val;
+      const [analysedType, outputSchema] = outputSchemaEither.val;
+
+      AgentMethodRegistry.setReturnType(
+        agentClassName,
+        methodName,
+        analysedType,
+      );
 
       return Either.right({
         name: methodName,
@@ -246,28 +268,38 @@ export function buildMethodInputSchema(
 
 export function buildOutputSchema(
   returnType: Type.Type,
-): Either.Either<DataSchema, string> {
+): Either.Either<[AnalysedType, DataSchema], string> {
   const undefinedSchema = handleUndefinedReturnType(returnType);
 
   if (Option.isSome(undefinedSchema)) {
-    return Either.right(undefinedSchema.val);
+    return Either.right([
+      tuple(undefined, 'undefined', []),
+      undefinedSchema.val,
+    ]);
   }
 
-  const schema: Either.Either<ElementSchema, string> = Either.map(
-    WitType.fromTsType(returnType, Option.none()),
-    (witType) => {
-      return {
-        tag: 'component-model',
-        val: witType,
-      };
-    },
-  );
+  const schema: Either.Either<[AnalysedType, ElementSchema], string> =
+    Either.map(WitType.fromTsType(returnType, Option.none()), (typeInfo) => {
+      const witType = typeInfo[0];
+      const analysedType = typeInfo[1];
+
+      return [
+        analysedType,
+        {
+          tag: 'component-model',
+          val: witType,
+        },
+      ];
+    });
 
   return Either.map(schema, (result) => {
-    return {
-      tag: 'tuple',
-      val: [['return-value', result]],
-    };
+    return [
+      result[0],
+      {
+        tag: 'tuple',
+        val: [['return-value', result[1]]],
+      },
+    ];
   });
 }
 
@@ -281,6 +313,12 @@ function convertToElementSchema(
   const paramTypeName = parameterType.name;
 
   if (paramTypeName && paramTypeName === 'UnstructuredText') {
+    AgentMethodParamRegistry.ensureMeta(
+      agentClassName,
+      methodName,
+      parameterName,
+    );
+
     const methodMetadata = AgentMethodParamRegistry.lookup(agentClassName);
 
     const parameterMetadata = methodMetadata?.get(methodName);
@@ -302,6 +340,12 @@ function convertToElementSchema(
   }
 
   if (paramTypeName && paramTypeName === 'UnstructuredBinary') {
+    AgentMethodParamRegistry.ensureMeta(
+      agentClassName,
+      methodName,
+      parameterName,
+    );
+
     const methodMetadata = AgentMethodParamRegistry.lookup(agentClassName);
 
     const parameterMetadata = methodMetadata?.get(methodName);
@@ -322,7 +366,17 @@ function convertToElementSchema(
     return Either.right(elementSchema);
   }
 
-  return Either.map(WitType.fromTsType(parameterType, scope), (witType) => {
+  return Either.map(WitType.fromTsType(parameterType, scope), (typeInfo) => {
+    const witType = typeInfo[0];
+    const analysedType = typeInfo[1];
+
+    AgentMethodParamRegistry.setAnalysedType(
+      agentClassName,
+      methodName,
+      parameterName,
+      analysedType,
+    );
+
     return {
       tag: 'component-model',
       val: witType,
