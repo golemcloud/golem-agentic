@@ -53,6 +53,11 @@ jobs:
             exit 1
           )    
 
+      - name: Build the package
+        working-directory: ./golem-ts-agentic
+        run: |
+          pnpm run build
+
       - name: Build the base image
         working-directory: ./golem-ts-agentic/template-golem-agent-ts
         run: |
@@ -68,11 +73,6 @@ jobs:
             echo "Failed to copy the base agent template to the golem-ts-sdk package"
             exit 1
           )
-
-      - name: Build the package
-        working-directory: ./golem-ts-agentic
-        run: |
-          pnpm run build
 
       - name: Run tests
         working-directory: ./golem-ts-agentic
@@ -126,6 +126,10 @@ jobs:
         working-directory: ./golem-ts-agentic
         run: pnpm install
 
+      - name: Build all packages
+        working-directory: ./golem-ts-agentic
+        run: pnpm run build
+
       - name: Build the base image
         working-directory: ./golem-ts-agentic/template-golem-agent-ts
         run: |
@@ -141,10 +145,6 @@ jobs:
             echo "Failed to copy the base agent template to the golem-ts-sdk package"
             exit 1
           )
-
-      - name: Build all packages
-        working-directory: ./golem-ts-agentic
-        run: pnpm run build
 
       - name: Publish all packages
         working-directory: ./golem-ts-agentic
