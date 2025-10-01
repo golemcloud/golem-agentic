@@ -24,11 +24,13 @@ jobs:
       - name: Setup Rust
         run: rustup update stable --no-self-update && rustup default stable
 
-      - name: Install wit-deps-cli for WIT deps management
-        run: cargo install wit-deps-cli
-     
+      - uses: davidB/rust-cargo-make@v1
+      - uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-component
+        run: cargo binstall --force cargo-component@0.21.1
+
       - name: Install wasm-rquickjs
-        run: cargo install wasm-rquickjs-cli     
+        run: cargo install wasm-rquickjs-cli
 
       - name: Install dependencies
         working-directory: ./golem-ts-agentic
@@ -50,6 +52,22 @@ jobs:
             echo "Code formatting issues found. Please run 'npm run format' to fix them."
             exit 1
           )    
+
+      - name: Build the base image
+        working-directory: ./golem-ts-agentic/template-golem-agent-ts
+        run: |
+          pnpm run generate || (
+            echo "Failed to generate the Rust crate for the base agent template"
+            exit 1
+          )
+          pnpm run build || (
+            echo "Failed to build the base agent template"
+            exit 1
+          )
+          pnpm run copy || (
+            echo "Failed to copy the base agent template to the golem-ts-sdk package"
+            exit 1
+          )
 
       - name: Build the package
         working-directory: ./golem-ts-agentic
@@ -80,11 +98,12 @@ jobs:
       - name: Setup Rust
         run: rustup update stable --no-self-update && rustup default stable
 
-      - name: Install wit-deps-cli for WIT deps management
-        run: cargo install wit-deps-cli
-     
       - name: Install wasm-rquickjs
-        run: cargo install wasm-rquickjs-cli       
+        run: cargo install wasm-rquickjs-cli
+
+      - uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-component
+        run: cargo binstall --force cargo-component@0.21.1
 
       - name: Extract version from tag
         id: get_version
@@ -106,6 +125,22 @@ jobs:
       - name: Install dependencies
         working-directory: ./golem-ts-agentic
         run: pnpm install
+
+      - name: Build the base image
+        working-directory: ./golem-ts-agentic/template-golem-agent-ts
+        run: |
+          pnpm run generate || (
+            echo "Failed to generate the Rust crate for the base agent template"
+            exit 1
+          )
+          pnpm run build || (
+            echo "Failed to build the base agent template"
+            exit 1
+          )
+          pnpm run copy || (
+            echo "Failed to copy the base agent template to the golem-ts-sdk package"
+            exit 1
+          )
 
       - name: Build all packages
         working-directory: ./golem-ts-agentic
