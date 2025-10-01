@@ -61,6 +61,13 @@ jobs:
       - name: Build the base image
         working-directory: ./golem-ts-agentic/template-golem-agent-ts
         run: |
+          pnpm update || (
+            echo "Failed to update deps for the base agent template"
+            exit 1
+          )
+          pnpm install || (
+            echo "Failed to install deps the base agent template"
+          )
           pnpm run generate || (
             echo "Failed to generate the Rust crate for the base agent template"
             exit 1
@@ -133,6 +140,13 @@ jobs:
       - name: Build the base image
         working-directory: ./golem-ts-agentic/template-golem-agent-ts
         run: |
+          pnpm update || (
+            echo "Failed to update deps for the base agent template"
+            exit 1
+          )
+          pnpm install || (
+            echo "Failed to install deps the base agent template"
+          )
           pnpm run generate || (
             echo "Failed to generate the Rust crate for the base agent template"
             exit 1
