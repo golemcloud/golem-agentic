@@ -1,6 +1,0 @@
-Build
-
-```
-npm run build
-
-```
