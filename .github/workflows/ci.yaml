@@ -58,6 +58,15 @@ jobs:
         run: |
           pnpm run build
 
+      - name: Verify golem-ts-sdk types are committed
+        working-directory: ./golem-ts-agentic
+        run: |
+          if ! git diff --exit-code packages/golem-ts-sdk/types; then
+            echo "❌ The files in packages/golem-ts-sdk/types differ from the committed version."
+            echo "Please run 'pnpm run build' and commit the updated files."
+            exit 1
+          fi         
+
       - name: Build the base image
         working-directory: ./golem-ts-agentic/template-golem-agent-ts
         run: |
