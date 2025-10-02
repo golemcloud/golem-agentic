@@ -37,7 +37,7 @@ jobs:
         run: |
           pnpm install
 
-      - name: Check code quality    
+      - name: Check code quality
         working-directory: ./golem-ts-agentic
         run: |
           pnpm run lint || (
@@ -70,14 +70,14 @@ jobs:
       - name: Build the base image
         working-directory: ./golem-ts-agentic/template-golem-agent-ts
         run: |
-          pnpm install
-          pnpm run dist
+          npm install
+          npm run dist
 
       - name: Run tests
         working-directory: ./golem-ts-agentic
         run: |
-          pnpm run test    
-         
+          pnpm run test
+
   publish-ts-agentic:
     needs: build-ts-agentic
     runs-on: blacksmith
@@ -89,7 +89,7 @@ jobs:
         with:
           node-version: "20.x"
           registry-url: "https://registry.npmjs.org"
-      
+
       - uses: pnpm/action-setup@v2
         with:
           version: latest
