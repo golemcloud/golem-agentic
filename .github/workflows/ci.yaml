@@ -67,7 +67,7 @@ jobs:
             exit 1
           fi         
 
-      - name: Build the agent template
+      - name: Build the agent template WASM binary
         working-directory: ./golem-ts-agentic
         run: pnpm run build-agent-template
 
@@ -127,8 +127,8 @@ jobs:
         working-directory: ./golem-ts-agentic
         run: pnpm run build
 
-      - name: Build the base image
-        working-directory: ./golem-ts-agentic/template-golem-agent-ts
+      - name: Build the agent template WASM binary
+        working-directory: ./golem-ts-agentic
         run: pnpm run build-agent-template
 
       - name: Publish all packages
