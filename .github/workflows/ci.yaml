@@ -132,8 +132,8 @@ jobs:
       - name: Build the base image
         working-directory: ./golem-ts-agentic/template-golem-agent-ts
         run: |
-          pnpm install
-          pnpm run dist
+          npm install
+          npm run dist
 
       - name: Publish all packages
         working-directory: ./golem-ts-agentic
