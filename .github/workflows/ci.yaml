@@ -67,11 +67,9 @@ jobs:
             exit 1
           fi         
 
-      - name: Build the base image
-        working-directory: ./golem-ts-agentic/template-golem-agent-ts
-        run: |
-          npm install
-          npm run dist
+      - name: Build the agent template
+        working-directory: ./golem-ts-agentic
+        run: pnpm run build-agent-template
 
       - name: Run tests
         working-directory: ./golem-ts-agentic
@@ -131,9 +129,7 @@ jobs:
 
       - name: Build the base image
         working-directory: ./golem-ts-agentic/template-golem-agent-ts
-        run: |
-          npm install
-          npm run dist
+        run: pnpm run build-agent-template
 
       - name: Publish all packages
         working-directory: ./golem-ts-agentic
