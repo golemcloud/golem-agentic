@@ -26,10 +26,6 @@ export const FooAgentClassName = new AgentClassName('FooAgent');
 export const BarAgentClassName = new AgentClassName('BarAgent');
 export const BarAgentCustomClassName = new AgentClassName('my-complex-agent');
 
-export function getAll() {
-  return TypeMetadata.getAll();
-}
-
 export function getTestInterfaceType(): [AnalysedType, Type.Type] {
   return fetchTypeFromBarAgent('TestInterfaceType');
 }
@@ -99,7 +95,7 @@ export function getRecordFieldsFromAnalysedType(
 function fetchTypeFromBarAgent(
   typeNameInTestData: string,
 ): [AnalysedType, Type.Type] {
-  const complexAgentMetadata = TypeMetadata.get('BarAgent');
+  const complexAgentMetadata = TypeMetadata.get(BarAgentClassName.value);
 
   if (!complexAgentMetadata) {
     throw new Error('Class metadata for BarAgent not found');
@@ -111,12 +107,18 @@ function fetchTypeFromBarAgent(
   });
 
   if (constructorArg) {
-    const analysedType = AgentConstructorParamRegistry.lookupParamType(
+    const typeInfo = AgentConstructorParamRegistry.getParamType(
       BarAgentClassName,
       constructorArg.name,
     );
 
-    return [analysedType!, constructorArg.type];
+    if (!typeInfo || typeInfo.tag !== 'analysed') {
+      throw new Error(
+        `Test failure: Unsupported type for constructor parameter ${constructorArg.name}`,
+      );
+    }
+
+    return [typeInfo.val, constructorArg.type];
   }
 
   const methods = Array.from(complexAgentMetadata.methods);
@@ -126,12 +128,18 @@ function fetchTypeFromBarAgent(
       method.returnType &&
       Type.getTypeName(method.returnType) === typeNameInTestData
     ) {
-      const analysedType = AgentMethodRegistry.lookupReturnType(
+      const returnType = AgentMethodRegistry.lookupReturnType(
         BarAgentClassName,
         name,
       );
 
-      return [analysedType!, method.returnType];
+      if (!returnType || returnType.tag !== 'analysed') {
+        throw new Error(
+          `Return type ${returnType?.tag} not supported in test data`,
+        );
+      }
+
+      return [returnType.val, method.returnType];
     }
 
     const param = Array.from(method.methodParams.entries()).find(([_, t]) => {
@@ -140,14 +148,22 @@ function fetchTypeFromBarAgent(
     });
 
     if (param) {
-      const analysedType = AgentMethodParamRegistry.lookupParamType(
+      const typeInfo = AgentMethodParamRegistry.getParamType(
         BarAgentClassName,
         name,
         param[0],
       );
 
-      return [analysedType!, param[1]];
+      if (!typeInfo || typeInfo.tag !== 'analysed') {
+        throw new Error(
+          `Test failure: Unsupported type for parameter ${param[0]} in method ${name}`,
+        );
+      }
+
+      return [typeInfo.val, param[1]];
     }
   }
-  throw new Error(`Type ${typeNameInTestData} not found in metadata`);
+  throw new Error(
+    `Test failure: Unresolved type ${typeNameInTestData}. Make sure \`${BarAgentClassName.value}\` use ${typeNameInTestData}`,
+  );
 }

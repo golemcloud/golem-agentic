@@ -61,6 +61,7 @@ export function buildJSONFromType(type: Type.Type): LiteTypeJSON {
         name: type.name,
         types: type.unionTypes.map(buildJSONFromType),
         optional: type.optional,
+        typeParams: type.typeParams.map(buildJSONFromType),
       };
 
     case 'object':
@@ -80,6 +81,7 @@ export function buildJSONFromType(type: Type.Type): LiteTypeJSON {
         name: type.name,
         properties: props,
         optional: type.optional,
+        typeParams: type.typeParams.map(buildJSONFromType),
       };
 
     case 'class':
@@ -118,6 +120,7 @@ export function buildJSONFromType(type: Type.Type): LiteTypeJSON {
         name: type.name,
         properties: interfaceProps,
         optional: type.optional,
+        typeParams: type.typeParams.map(buildJSONFromType),
       };
 
     case 'promise':

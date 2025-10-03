@@ -23,13 +23,22 @@ import {
   RegisteredAgentType,
 } from 'golem:agent/host';
 import { AgentClassName } from '../newTypes/agentClassName';
-import { DataValue, ElementValue } from 'golem:agent/common';
+import {
+  BinaryReference,
+  DataValue,
+  ElementValue,
+  TextReference,
+} from 'golem:agent/common';
 import * as Value from './mapping/values/Value';
 import { RemoteMethod } from '../baseAgent';
 import { AgentMethodParamRegistry } from './registry/agentMethodParamRegistry';
 import { AgentConstructorParamRegistry } from './registry/agentConstructorParamRegistry';
 import { AgentMethodRegistry } from './registry/agentMethodRegistry';
 import { deserialize } from './mapping/values/deserializer';
+import {
+  castTsValueToBinaryReference,
+  castTsValueToTextReference,
+} from './mapping/values/unstructured';
 
 export function getRemoteClient<T extends new (...args: any[]) => any>(
   ctor: T,
@@ -82,9 +91,9 @@ function getMethodProxy(
 
   if (!methodParams) {
     throw new Error(
-      `Method ${String(
+      `Unresolved method ${String(
         prop,
-      )} not found in metadata. Make sure this method exists and is not private/protected`,
+      )} in RPC call. Make sure this method exists and is not private/protected`,
     );
   }
 
@@ -101,24 +110,34 @@ function getMethodProxy(
     methodName,
   );
 
-  function encodeArgs(fnArgs: any[]) {
+  function serializeArgs(fnArgs: any[]): WitValue.WitValue[] {
     const parameterWitValuesEither = Either.all(
       fnArgs.map((fnArg, index) => {
         const param = paramInfo[index];
-        const analysedType = AgentMethodParamRegistry.lookupParamType(
+        const typeInfo = AgentMethodParamRegistry.getParamType(
           agentClassName,
           methodName,
           param[0],
         );
-        if (!analysedType) {
+
+        if (!typeInfo) {
           throw new Error(
-            `Parameter type for parameter ${param[0]} of method ${String(
+            `Unsupported type for parameter ${param[0]} in method ${String(
               prop,
-            )} not found in metadata.`,
+            )}`,
           );
         }
 
-        return WitValue.fromTsValue(fnArg, analysedType);
+        switch (typeInfo.tag) {
+          case 'analysed':
+            return WitValue.fromTsValue(fnArg, typeInfo.val);
+
+          case 'unstructured-text':
+            return Either.right(WitValue.fromTsValueTextReference(fnArg));
+
+          case 'unstructured-binary':
+            return Either.right(WitValue.fromTsValueBinaryReference(fnArg));
+        }
       }),
     );
     if (Either.isLeft(parameterWitValuesEither)) {
@@ -128,7 +147,7 @@ function getMethodProxy(
   }
 
   async function invokeAndAwait(...fnArgs: any[]) {
-    const parameterWitValues = encodeArgs(fnArgs);
+    const parameterWitValues = serializeArgs(fnArgs);
     const wasmRpc = new WasmRpc(workerId);
 
     const rpcResultFuture = wasmRpc.asyncInvokeAndAwait(
@@ -155,23 +174,23 @@ function getMethodProxy(
           })()
         : rpcResult.val;
 
-    if (!returnTypeAnalysed) {
+    if (!returnTypeAnalysed || returnTypeAnalysed.tag !== 'analysed') {
       throw new Error(
-        `Return type for method ${String(prop)} not found in metadata`,
+        `Return type of method ${String(prop)}  not supported in remote calls`,
       );
     }
 
-    return deserialize(unwrapResult(rpcWitValue), returnTypeAnalysed);
+    return deserialize(unwrapResult(rpcWitValue), returnTypeAnalysed.val);
   }
 
   async function invokeFireAndForget(...fnArgs: any[]) {
-    const parameterWitValues = encodeArgs(fnArgs);
+    const parameterWitValues = serializeArgs(fnArgs);
     const wasmRpc = new WasmRpc(workerId);
     wasmRpc.invoke(functionName, parameterWitValues);
   }
 
   async function invokeSchedule(ts: Datetime, ...fnArgs: any[]) {
-    const parameterWitValues = encodeArgs(fnArgs);
+    const parameterWitValues = serializeArgs(fnArgs);
     const wasmRpc = new WasmRpc(workerId);
     wasmRpc.scheduleInvocation(ts, functionName, parameterWitValues);
   }
@@ -214,38 +233,67 @@ function getWorkerId(
   const constructorParamInfo = classMetadata.constructorArgs;
 
   const constructorParamTypes = constructorParamInfo.map((param) => {
-    const analysedType = AgentConstructorParamRegistry.lookupParamType(
+    const typeInfoInternal = AgentConstructorParamRegistry.getParamType(
       agentClassName,
       param.name,
     );
 
-    if (!analysedType) {
+    if (!typeInfoInternal) {
       throw new Error(
-        `Parameter type for constructor parameter ${param.name} of agent class ${agentClassName.value} not found in metadata.`,
+        `Unresolved type for constructor parameter ${param.name} in agent class ${agentClassName.value}`,
       );
     }
-    return analysedType;
+    return typeInfoInternal;
   });
 
   const constructorParamWitValuesResult: Either.Either<ElementValue[], string> =
     Either.all(
       constructorArgs.map((arg, index) => {
-        const typ = constructorParamTypes[index];
-        return Either.map(WitValue.fromTsValue(arg, typ), (witValue) => {
-          let elementValue: ElementValue = {
-            tag: 'component-model',
-            val: witValue,
-          };
+        const typeInfoInternal = constructorParamTypes[index];
 
-          return elementValue;
-        });
+        switch (typeInfoInternal.tag) {
+          case 'analysed':
+            return Either.map(
+              WitValue.fromTsValue(arg, typeInfoInternal.val),
+              (witValue) => {
+                let elementValue: ElementValue = {
+                  tag: 'component-model',
+                  val: witValue,
+                };
+
+                return elementValue;
+              },
+            );
+          case 'unstructured-text':
+            const textReference: TextReference =
+              castTsValueToTextReference(arg);
+
+            const elementValue: Either.Either<ElementValue, string> =
+              Either.right({
+                tag: 'unstructured-text',
+                val: textReference,
+              });
+
+            return elementValue;
+
+          case 'unstructured-binary':
+            const binaryReference: BinaryReference =
+              castTsValueToBinaryReference(arg);
+
+            const elementValueBinary: Either.Either<ElementValue, string> =
+              Either.right({
+                tag: 'unstructured-binary',
+                val: binaryReference,
+              });
+
+            return elementValueBinary;
+        }
       }),
     );
 
   if (Either.isLeft(constructorParamWitValuesResult)) {
     throw new Error(
-      'Failed to create remote agent: ' +
-        JSON.stringify(constructorParamWitValuesResult.val),
+      'Failed to create remote agent: ' + constructorParamWitValuesResult.val,
     );
   }
 

@@ -30,7 +30,7 @@ import {
   ResultTypeExactBoth,
   ResultTypeNonExact2,
 } from './testTypes';
-import { languageCodes, mimeTypes, multimodal } from '../src/decorators';
+import { multimodal } from '../src/decorators';
 
 @agent()
 class FooAgent extends BaseAgent {
@@ -116,15 +116,15 @@ class FooAgent extends BaseAgent {
     optionalStringType: string | null,
     optionalUnionType: UnionType | null,
     unstructuredText: UnstructuredText,
-    unstructuredBinary: UnstructuredBinary,
+    unstructuredTextWithLanguageCode: UnstructuredText<['en', 'de']>,
+    unstructuredBinary: UnstructuredBinary<['application/json']>,
   ): Promise<void> {
     const remoteClient = BarAgent.get(
       testInterfaceType,
       optionalStringType,
       optionalUnionType,
       unstructuredText,
-      unstructuredText,
-      unstructuredBinary,
+      unstructuredTextWithLanguageCode,
       unstructuredBinary,
     );
 
@@ -136,6 +136,22 @@ class FooAgent extends BaseAgent {
       { seconds: 50000n, nanoseconds: 0 },
       'foo',
     );
+  }
+
+  async fun15(param: UnstructuredText): Promise<UnstructuredText> {
+    return param;
+  }
+
+  async fun16(
+    param: UnstructuredText<['en', 'de']>,
+  ): Promise<UnstructuredText<['en', 'de']>> {
+    return param;
+  }
+
+  async fun17(
+    param: UnstructuredBinary<['application/json']>,
+  ): Promise<UnstructuredBinary<['application/json']>> {
+    return param;
   }
 
   // Overridden methods should be  not be considered as agent methods
@@ -166,16 +182,9 @@ class BarAgent extends BaseAgent {
     readonly testInterfaceType: Types.TestInterfaceType,
     readonly optionalStringType: string | null,
     readonly optionalUnionType: UnionType | null,
-
     readonly unstructuredText: UnstructuredText,
-
-    @languageCodes(['en'])
-    readonly unstructuredTextWithLanguageCode: UnstructuredText,
-
-    readonly unstructuredBinary: UnstructuredBinary,
-
-    @mimeTypes(['application/json'])
-    readonly unstructuredBinaryWithMimeType: UnstructuredBinary,
+    readonly unstructuredTextWithLanguageCode: UnstructuredText<['en', 'de']>,
+    readonly unstructuredBinary: UnstructuredBinary<['application/json']>,
   ) {
     super();
     this.testInterfaceType = testInterfaceType;
@@ -213,14 +222,9 @@ class BarAgent extends BaseAgent {
     resultTypeNonExact: ResultTypeNonExact,
     resultTypeNonExact2: ResultTypeNonExact2,
     unstructuredText: UnstructuredText,
-
-    @languageCodes(['en'])
-    unstructuredTextWithLanguageCode: UnstructuredText,
-
-    unstructuredBinary: UnstructuredBinary,
-
-    @mimeTypes(['application/json'])
-    unstructuredBinaryWithMimeType: UnstructuredBinary,
+    unstructuredTextWithLanguageCode: UnstructuredText<['en', 'de']>,
+    unstructuredBinary: UnstructuredBinary<['application/json']>,
+    unstructuredBinaryWithMimeType: UnstructuredBinary<['application/json']>,
   ): Types.PromiseType {
     return Promise.resolve(`Weather for ${location} is sunny!`);
   }
@@ -285,7 +289,11 @@ class BarAgent extends BaseAgent {
     throw new Error('Unimplemented');
   }
 
-  async fun18(text: string): Promise<UnstructuredText> {
+  async fun18(text: string): Promise<UnstructuredText<['en', 'de']>> {
+    throw new Error('Unimplemented');
+  }
+
+  async fun19(text: string): Promise<UnstructuredBinary<['application/json']>> {
     throw new Error('Unimplemented');
   }
 
@@ -300,23 +308,23 @@ class BarAgent extends BaseAgent {
     };
   }
 
-  async fun19(text: string): Promise<EitherZ> {
+  async fun20(text: string): Promise<EitherZ> {
     return {
       tag: 'okay',
       val: 'hello',
     };
   }
 
-  async fun20(text: string) {
+  async fun21(text: string) {
     console.log('Hello World');
   }
 
-  fun21 = (text: string) => {
+  fun22 = (text: string) => {
     console.log('Hello World');
   };
 
   @multimodal()
-  async fun22(text: [string]): Promise<string> {
+  async fun23(text: [string]): Promise<string> {
     return this.getId().value;
   }
 }

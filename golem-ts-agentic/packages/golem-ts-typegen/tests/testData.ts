@@ -116,6 +116,13 @@ export interface TestInterfaceType {
 
 export type RecordType = Record<string, number>;
 
+export type MyCode = string;
+
+export type ObjectWithTypeParameter<C extends MyCode[] = []> = { a: C };
+export type UnionWithTypeParameter<C extends MyCode[] = []> =
+  | { a: C }
+  | { b: C };
+
 type RecursiveType = {
   more: RecursiveType | undefined;
 };
@@ -150,6 +157,8 @@ class MyAgent {
     eitherZType: EitherZ,
     literallyObject: Object,
     recursiveType: RecursiveType,
+    objectWithTypeParameter: ObjectWithTypeParameter<["en", "de"]>,
+    unionWithTypeParameter: UnionWithTypeParameter<["en", "de"]>,
   ): PromiseType {
     return Promise.resolve(`Weather for ${location} is sunny!`);
   }

@@ -106,6 +106,14 @@ export function getRecursiveType(): Type.Type {
   return fetchType("RecursiveType");
 }
 
+export function getObjectWithTypeParameter(): Type.Type {
+  return fetchType("ObjectWithTypeParameter");
+}
+
+export function getUnionWithTypeParameter(): Type.Type {
+  return fetchType("UnionWithTypeParameter");
+}
+
 // Fetch a type by its name from the loaded metadata (loaded by setup module)
 function fetchType(typeNameInTestData: string): Type.Type {
   const classMetadata = Array.from(getAll()).map(([_, v]) => v);
@@ -141,5 +149,7 @@ function fetchType(typeNameInTestData: string): Type.Type {
     }
   }
 
-  throw new Error(`Type ${typeNameInTestData} not found in metadata`);
+  throw new Error(
+    `Unresolved type ${typeNameInTestData}. Make sure test data ${typeNameInTestData}`,
+  );
 }

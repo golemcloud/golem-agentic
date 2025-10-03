@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { ElementSchema, TextReference } from 'golem:agent/common';
-
+import { TextReference } from 'golem:agent/common';
+import * as Either from '../newTypes/either';
 /**
  * Represents unstructured text input, which can be either a URL or inline text.
  *
@@ -21,10 +21,12 @@ import { ElementSchema, TextReference } from 'golem:agent/common';
  *
  * ```ts
  * const urlText: UnstructuredText = UnstructuredText.fromUrl("https://example.com");
- * const inlineText: UnstructuredText = UnstructuredText.fromInline("Hello, world!", "en");
+ * const inlineText: UnstructuredText = UnstructuredText.fromInline("Hello, world!", ['en']);
  * ```
  */
-export type UnstructuredText =
+type LanguageCode = string;
+
+export type UnstructuredText<LC extends LanguageCode[] = []> =
   | {
       tag: 'url';
       val: string;
@@ -32,23 +34,46 @@ export type UnstructuredText =
   | {
       tag: 'inline';
       val: string;
-      languageCode?: string;
+      languageCode?: LC[number];
     };
 
 export const UnstructuredText = {
-  fromDataValue(dataValue: TextReference): UnstructuredText {
+  fromDataValue<LC extends string[] = []>(
+    parameterName: string,
+    dataValue: TextReference,
+    allowedCodes: string[],
+  ): Either.Either<UnstructuredText<LC>, string> {
     if (dataValue.tag === 'url') {
-      return {
+      return Either.right({
         tag: 'url',
         val: dataValue.val,
-      };
+      });
     }
 
-    return {
+    if (allowedCodes.length > 0) {
+      if (!dataValue.val.textType) {
+        return Either.left(
+          `Language code is required. Allowed codes: ${allowedCodes.join(', ')}`,
+        );
+      }
+
+      if (!allowedCodes.includes(dataValue.val.textType.languageCode)) {
+        return Either.left(
+          `Invalid value for parameter ${parameterName}. Language code \`${dataValue.val.textType.languageCode}\` is not allowed. Allowed codes: ${allowedCodes.join(', ')}`,
+        );
+      }
+
+      return Either.right({
+        tag: 'inline',
+        val: dataValue.val.data,
+        languageCode: dataValue.val.textType.languageCode,
+      });
+    }
+
+    return Either.right({
       tag: 'inline',
       val: dataValue.val.data,
-      languageCode: dataValue.val.textType?.languageCode,
-    };
+    });
   },
 
   /**
@@ -71,32 +96,14 @@ export const UnstructuredText = {
    * @param languageCode - The language code
    * @returns A `TextInput` object with `languageCode` set to `'en'`.
    */
-  fromInline(data: string, languageCode?: string): UnstructuredText {
-    languageCode = languageCode ? languageCode : 'en';
+  fromInline<LC extends LanguageCode[] = []>(
+    data: string,
+    languageCode?: LC[number],
+  ): UnstructuredText<LC> {
     return {
       tag: 'inline',
       val: data,
       languageCode: languageCode,
-    };
-  },
-};
-
-export const TextSchema = {
-  fromLanguageCode(languageCodes?: string[]): ElementSchema {
-    if (languageCodes) {
-      return {
-        tag: 'unstructured-text',
-        val: {
-          restrictions: languageCodes.map((code) => {
-            return { languageCode: code };
-          }),
-        },
-      };
-    }
-
-    return {
-      tag: 'unstructured-text',
-      val: {},
     };
   },
 };

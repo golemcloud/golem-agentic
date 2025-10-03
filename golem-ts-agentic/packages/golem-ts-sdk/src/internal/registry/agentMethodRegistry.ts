@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { AgentClassName } from '../../newTypes/agentClassName';
-import { AnalysedType } from '../mapping/types/AnalysedType';
+import { TypeInfoInternal } from './typeInfoInternal';
 
 type AgentClassNameString = string;
 type AgentMethodNameString = string;
@@ -26,7 +26,7 @@ const agentMethodRegistry = new Map<
       prompt?: string;
       description?: string;
       multimodal?: boolean;
-      returnType?: AnalysedType;
+      returnType?: TypeInfoInternal;
     }
   >
 >();
@@ -49,7 +49,7 @@ export const AgentMethodRegistry = {
   lookupReturnType(
     agentClassName: AgentClassName,
     agentMethodName: string,
-  ): AnalysedType | undefined {
+  ): TypeInfoInternal | undefined {
     const classMeta = agentMethodRegistry.get(agentClassName.value);
     return classMeta?.get(agentMethodName)?.returnType;
   },
@@ -73,7 +73,7 @@ export const AgentMethodRegistry = {
   setReturnType(
     agentClassName: AgentClassName,
     method: string,
-    returnType: AnalysedType,
+    returnType: TypeInfoInternal,
   ) {
     AgentMethodRegistry.ensureMeta(agentClassName, method);
     const classMeta = agentMethodRegistry.get(agentClassName.value)!;

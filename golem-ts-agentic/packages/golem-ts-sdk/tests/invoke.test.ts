@@ -14,7 +14,6 @@
 
 import { ClassMetadata, TypeMetadata } from '@golemcloud/golem-ts-types-core';
 import * as Either from '../src/newTypes/either';
-import { deserializeDataValue } from '../src/decorators';
 import * as Option from '../src/newTypes/option';
 import { AgentInitiatorRegistry } from '../src/internal/registry/agentInitiatorRegistry';
 import { expect } from 'vitest';
@@ -41,14 +40,24 @@ import {
   unionArb,
   unionWithLiteralArb,
   unionWithOnlyLiteralsArb,
+  unstructuredBinaryWithMimeTypeArb,
+  unstructuredTextArb,
+  unstructuredTextWithLCArb,
 } from './arbitraries';
 import { ResolvedAgent } from '../src/internal/resolvedAgent';
 import * as Value from '../src/internal/mapping/values/Value';
-import { DataValue } from 'golem:agent/common';
+import { DataValue, ElementValue } from 'golem:agent/common';
 import * as util from 'node:util';
 import { AgentConstructorParamRegistry } from '../src/internal/registry/agentConstructorParamRegistry';
 import { AgentMethodParamRegistry } from '../src/internal/registry/agentMethodParamRegistry';
+import {
+  castTsValueToBinaryReference,
+  castTsValueToTextReference,
+} from '../src/internal/mapping/values/unstructured';
 import { AgentMethodRegistry } from '../src/internal/registry/agentMethodRegistry';
+import { deserializeDataValue } from '../src/decorators';
+import { convertTsValueToElementValue } from '../src/internal/mapping/values/elementValue';
+import { UnstructuredText } from '../src';
 import { AgentClassName } from '../src';
 
 test('An agent can be successfully initiated and all of its methods can be invoked', () => {
@@ -69,6 +78,9 @@ test('An agent can be successfully initiated and all of its methods can be invok
       resultTypeExactArb,
       resultTypeNonExactArb,
       resultTypeNonExact2Arb,
+      unstructuredTextArb,
+      unstructuredTextWithLCArb,
+      unstructuredBinaryWithMimeTypeArb,
       (
         arbString,
         number,
@@ -85,6 +97,9 @@ test('An agent can be successfully initiated and all of its methods can be invok
         resultTypeExactBoth,
         resultTypeNonExact,
         resultTypeNonExact2,
+        unstructuredText,
+        unstructuredTextWithLC,
+        unstructuredBinaryWithMimeType,
       ) => {
         overrideSelfMetadataImpl(FooAgentClassName);
 
@@ -96,6 +111,7 @@ test('An agent can be successfully initiated and all of its methods can be invok
 
         const resolvedAgent = initiateFooAgent(arbString, typeRegistry);
 
+        // Invoking function with string type
         testInvoke(
           'fun1',
           [['param', arbString]],
@@ -103,6 +119,7 @@ test('An agent can be successfully initiated and all of its methods can be invok
           'Weather in ' + arbString + ' is sunny!',
         );
 
+        // Invoking function with multiple primitive types
         testInvoke(
           'fun2',
           [
@@ -118,6 +135,7 @@ test('An agent can be successfully initiated and all of its methods can be invok
           `Weather in ${arbString} is sunny!`,
         );
 
+        // Invoking function with object type
         testInvoke(
           'fun3',
           [
@@ -133,6 +151,7 @@ test('An agent can be successfully initiated and all of its methods can be invok
           `Weather in ${arbString} is sunny!`,
         );
 
+        // Invoking function with return type not specified
         testInvoke(
           'fun4',
           [
@@ -148,6 +167,7 @@ test('An agent can be successfully initiated and all of its methods can be invok
           undefined,
         );
 
+        // Arrow function
         testInvoke(
           'fun5',
           [['param', arbString]],
@@ -155,8 +175,10 @@ test('An agent can be successfully initiated and all of its methods can be invok
           `Weather in ${arbString} is sunny!`,
         );
 
+        // Void return type
         testInvoke('fun6', [['param', arbString]], resolvedAgent, undefined);
 
+        // Invoking with various kind of optional types embedded in union type
         testInvoke(
           'fun7',
           [
@@ -180,6 +202,7 @@ test('An agent can be successfully initiated and all of its methods can be invok
           },
         );
 
+        // Invoking with union with literals
         testInvoke(
           'fun8',
           [['a', unionWithLiterals]],
@@ -187,6 +210,7 @@ test('An agent can be successfully initiated and all of its methods can be invok
           unionWithLiterals,
         );
 
+        // Invoking with tagged union
         testInvoke(
           'fun9',
           [['param', taggedUnion]],
@@ -194,6 +218,7 @@ test('An agent can be successfully initiated and all of its methods can be invok
           taggedUnion,
         );
 
+        // Invoking with union with only literals
         testInvoke(
           'fun10',
           [['param', unionWithOnlyLiterals]],
@@ -201,6 +226,7 @@ test('An agent can be successfully initiated and all of its methods can be invok
           unionWithOnlyLiterals,
         );
 
+        // Invoking with result type
         testInvoke(
           'fun11',
           [['param', resultTypeExactBoth]],
@@ -208,6 +234,7 @@ test('An agent can be successfully initiated and all of its methods can be invok
           resultTypeExactBoth,
         );
 
+        // invoking with result-like type
         testInvoke(
           'fun12',
           [['param', resultTypeNonExact]],
@@ -215,11 +242,36 @@ test('An agent can be successfully initiated and all of its methods can be invok
           resultTypeNonExact,
         );
 
+        // invoking with another result-like type
         testInvoke(
           'fun13',
           [['param', resultTypeNonExact2]],
           resolvedAgent,
           resultTypeNonExact2,
+        );
+
+        // Invoking with unstructured text
+        testInvoke(
+          'fun15',
+          [['param', unstructuredText]],
+          resolvedAgent,
+          unstructuredText,
+        );
+
+        // Invoking with unstructured text with language code
+        testInvoke(
+          'fun16',
+          [['param', unstructuredTextWithLC]],
+          resolvedAgent,
+          unstructuredTextWithLC,
+        );
+
+        // Invoking with unstructured binary with mime type
+        testInvoke(
+          'fun17',
+          [['param', unstructuredBinaryWithMimeType]],
+          resolvedAgent,
+          unstructuredBinaryWithMimeType,
         );
       },
     ),
@@ -242,41 +294,50 @@ test('BarAgent can be successfully initiated', () => {
         }
 
         // TestInterfaceType
-        const arg0 = AgentConstructorParamRegistry.lookupParamType(
+        const arg0 = AgentConstructorParamRegistry.getParamType(
           BarAgentClassName,
           typeRegistry.constructorArgs[0].name,
         );
 
         // string | null
-        const arg1 = AgentConstructorParamRegistry.lookupParamType(
+        const arg1 = AgentConstructorParamRegistry.getParamType(
           BarAgentClassName,
           typeRegistry.constructorArgs[1].name,
         );
 
         // UnionType | null
-        const arg2 = AgentConstructorParamRegistry.lookupParamType(
+        const arg2 = AgentConstructorParamRegistry.getParamType(
           BarAgentClassName,
           typeRegistry.constructorArgs[2].name,
         );
 
-        if (!arg0 || !arg1 || !arg2) {
-          throw new Error('Test error: constructor params not found');
+        if (
+          !arg0 ||
+          !arg1 ||
+          !arg2 ||
+          arg0.tag !== 'analysed' ||
+          arg1.tag !== 'analysed' ||
+          arg2.tag !== 'analysed'
+        ) {
+          throw new Error(
+            'Test failure: unresolved type in BarAgent constructor',
+          );
         }
 
         const interfaceWit = Either.getOrThrowWith(
-          WitValue.fromTsValue(interfaceValue, arg0),
+          WitValue.fromTsValue(interfaceValue, arg0.val),
           (error) => new Error(error),
         );
 
         const optionalStringWit = Either.getOrThrowWith(
-          WitValue.fromTsValue(stringValue, arg1),
+          WitValue.fromTsValue(stringValue, arg1.val),
           (error) => new Error(error),
         );
 
         expect(Value.fromWitValue(optionalStringWit).kind).toEqual('option');
 
         const optionalUnionWit = Either.getOrThrowWith(
-          WitValue.fromTsValue(unionValue, arg2),
+          WitValue.fromTsValue(unionValue, arg2.val),
           (error) => new Error(error),
         );
 
@@ -313,37 +374,85 @@ test('BarAgent can be successfully initiated', () => {
   );
 });
 
+// This is already in the above big test, but we keep it separate to have a clearer
+// view of how unstructured text is handled.
+test('Invoke function that takes unstructured-text and returns unstructured-text', () => {
+  overrideSelfMetadataImpl(FooAgentClassName);
+
+  const typeRegistry = TypeMetadata.get(FooAgentClassName.value);
+
+  if (!typeRegistry) {
+    throw new Error('FooAgent type metadata not found');
+  }
+
+  const resolvedAgent = initiateFooAgent('foo', typeRegistry);
+
+  const validUnstructuredText: UnstructuredText<['en', 'de']> = {
+    tag: 'inline',
+    val: 'foo',
+    languageCode: 'de',
+  };
+
+  testInvoke(
+    'fun16',
+    [['param', validUnstructuredText]],
+    resolvedAgent,
+    validUnstructuredText,
+  );
+
+  // fun16 doesn't support language code `pl`. We dynamically invoke with it to see
+  // if the error is properly thrown.
+  const invalidUnstructuredText: UnstructuredText<['en', 'pl']> = {
+    tag: 'inline',
+    val: 'foo',
+    languageCode: 'pl',
+  };
+
+  const dataValue = createInputDataValue(
+    [['param', invalidUnstructuredText]],
+    'fun16',
+  );
+
+  resolvedAgent.invoke('fun16', dataValue).then((invokeResult) => {
+    if (invokeResult.tag === 'ok') {
+      throw new Error('Test failure: invocation should have failed');
+    } else {
+      expect(invokeResult.val.val).toContain(
+        'Failed to deserialize arguments for method fun16 in agent FooAgent: Invalid value for parameter param. Language code `pl` is not allowed. Allowed codes: en, de',
+      );
+    }
+  });
+});
+
 function initiateFooAgent(
-  constructorParamString: string,
+  constructorParam: string,
   simpleAgentClassMeta: ClassMetadata,
 ) {
   const constructorInfo = simpleAgentClassMeta.constructorArgs[0];
 
-  const constructorParamAnalysedType =
-    AgentConstructorParamRegistry.lookupParamType(
+  const constructorParamTypeInfoInternal =
+    AgentConstructorParamRegistry.getParamType(
       FooAgentClassName,
       constructorInfo.name,
     );
 
-  if (!constructorParamAnalysedType) {
+  if (!constructorParamTypeInfoInternal) {
     throw new Error(
-      `Constructor parameter type for FooAgent constructor parameter ${constructorInfo.name} not found in metadata.`,
+      `Test failure: unresolved type for ${constructorParam} in ${FooAgentClassName.value}`,
     );
   }
 
-  const witValue = Either.getOrThrowWith(
-    WitValue.fromTsValue(constructorParamString, constructorParamAnalysedType),
+  const elementValue = Either.getOrThrowWith(
+    convertTsValueToElementValue(
+      constructorParam,
+      constructorParamTypeInfoInternal,
+    ),
     (error) => new Error(error),
   );
 
   const constructorParams: DataValue = {
     tag: 'tuple',
-    val: [
-      {
-        tag: 'component-model',
-        val: witValue,
-      },
-    ],
+    val: [elementValue],
   };
 
   const agentInitiator = Option.getOrThrowWith(
@@ -362,47 +471,16 @@ function initiateFooAgent(
 
 function testInvoke(
   methodName: string,
-  parameterAndValue: [string, any][],
+  parameterNameAndValues: [string, any][],
   resolvedAgent: ResolvedAgent,
   expectedOutput: any,
 ) {
-  const returnTypeInfo = AgentMethodRegistry.lookupReturnType(
-    FooAgentClassName,
-    methodName,
-  );
+  // We need to first manually form the data-value to test the dynamic invoke.
+  // For this, we first convert the original ts-value to data value and do a round trip to ensure
+  // data matches exact.
+  const dataValue = createInputDataValue(parameterNameAndValues, methodName);
 
-  if (!returnTypeInfo) {
-    throw new Error(`Method ${methodName} not found in metadata`);
-  }
-
-  const witValues = parameterAndValue.map(([paramName, value]) => {
-    const paramAnalysedType = AgentMethodParamRegistry.lookupParamType(
-      FooAgentClassName,
-      methodName,
-      paramName,
-    );
-
-    if (!paramAnalysedType) {
-      throw new Error(
-        `Parameter type for parameter ${paramName} of method ${methodName} not found in metadata.`,
-      );
-    }
-
-    return Either.getOrThrowWith(
-      WitValue.fromTsValue(value, paramAnalysedType),
-      (error) => new Error(error),
-    );
-  });
-
-  const dataValues: DataValue = {
-    tag: 'tuple',
-    val: witValues.map((witValue) => ({
-      tag: 'component-model',
-      val: witValue,
-    })),
-  };
-
-  resolvedAgent.invoke(methodName, dataValues).then((invokeResult) => {
+  resolvedAgent.invoke(methodName, dataValue).then((invokeResult) => {
     const resultDataValue =
       invokeResult.tag === 'ok'
         ? invokeResult.val
@@ -410,12 +488,126 @@ function testInvoke(
             throw new Error(util.format(invokeResult.val));
           })();
 
-    const result = deserializeDataValue(resultDataValue, [
-      ['return-value', Option.some(returnTypeInfo)],
-    ])[0];
+    // Unless it is an RPC call, we don't really need to deserialize the result
+    // But to ensure the data-value returned above corresponds to the original input
+    // we deserialize and assert if the input is same as output.
+    const result = deserializeReturnValue(methodName, resultDataValue);
 
-    expect(result).toEqual(expectedOutput);
+    expect(result).toEqual(Either.right(expectedOutput));
   });
+}
+
+function createInputDataValue(
+  parameterNameAndValues: [string, any][],
+  methodName: string,
+): DataValue {
+  const elementValues: ElementValue[] = parameterNameAndValues.map(
+    ([paramName, value]) => {
+      const paramAnalysedType = AgentMethodParamRegistry.getParamType(
+        FooAgentClassName,
+        methodName,
+        paramName,
+      );
+
+      if (!paramAnalysedType) {
+        throw new Error(
+          `Unresolved type for \`${paramName}\` in method \`${methodName}\``,
+        );
+      }
+
+      switch (paramAnalysedType.tag) {
+        case 'analysed':
+          const witValue = Either.getOrThrowWith(
+            WitValue.fromTsValue(value, paramAnalysedType.val),
+            (error) => new Error(error),
+          );
+          return {
+            tag: 'component-model',
+            val: witValue,
+          };
+
+        case 'unstructured-text':
+          const textReference = castTsValueToTextReference(value);
+          return {
+            tag: 'unstructured-text',
+            val: textReference,
+          };
+
+        case 'unstructured-binary':
+          const binaryReference = castTsValueToBinaryReference(value);
+          return {
+            tag: 'unstructured-binary',
+            val: binaryReference,
+          };
+      }
+    },
+  );
+
+  return {
+    tag: 'tuple',
+    val: elementValues,
+  };
+}
+
+function deserializeReturnValue(
+  methodName: string,
+  returnValue: DataValue,
+): Either.Either<any[], string> {
+  const returnType = TypeMetadata.get(FooAgentClassName.value)?.methods.get(
+    methodName,
+  )?.returnType;
+
+  if (!returnType) {
+    throw new Error(`Method ${methodName} not found in metadata`);
+  }
+
+  const returnTypeAnalysedType = AgentMethodRegistry.lookupReturnType(
+    FooAgentClassName,
+    methodName,
+  );
+
+  if (!returnTypeAnalysedType) {
+    throw new Error(`Unsupported return type for method ${methodName}`);
+  }
+
+  switch (returnTypeAnalysedType.tag) {
+    case 'analysed':
+      return Either.map(
+        deserializeDataValue(returnValue, [
+          [
+            'return-value',
+            [returnType, { tag: 'analysed', val: returnTypeAnalysedType.val }],
+          ],
+        ]),
+        (v) => v[0],
+      );
+    case 'unstructured-text':
+      return Either.map(
+        deserializeDataValue(returnValue, [
+          [
+            'return-value',
+            [
+              returnType,
+              { tag: 'unstructured-text', val: returnTypeAnalysedType.val },
+            ],
+          ],
+        ]),
+        (v) => v[0],
+      );
+    case 'unstructured-binary':
+      return Either.map(
+        deserializeDataValue(returnValue, [
+          [
+            'return-value',
+            [
+              returnType,
+              { tag: 'unstructured-binary', val: returnTypeAnalysedType.val },
+            ],
+          ],
+        ]),
+        (v) => v[0],
+      );
+  }
 }
 
 function overrideSelfMetadataImpl(agentClassName: AgentClassName) {

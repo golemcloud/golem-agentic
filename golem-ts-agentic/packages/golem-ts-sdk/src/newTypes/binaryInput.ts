@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { ElementSchema, BinaryReference } from 'golem:agent/common';
+import * as Either from '../newTypes/either';
 
 /**
  * Represents unstructured binary input, which can be either a URL or inline binary data.
@@ -26,7 +27,9 @@ import { ElementSchema, BinaryReference } from 'golem:agent/common';
  * );
  * ```
  */
-export type UnstructuredBinary =
+type MimeType = string;
+
+export type UnstructuredBinary<MT extends MimeType[]> =
   | {
       tag: 'url';
       val: string;
@@ -34,23 +37,40 @@ export type UnstructuredBinary =
   | {
       tag: 'inline';
       val: Uint8Array;
-      mimeType?: string;
+      mimeType?: MT[number];
     };
 
 export const UnstructuredBinary = {
-  fromDataValue(dataValue: BinaryReference): UnstructuredBinary {
+  fromDataValue<MT extends string[] = []>(
+    parameterName: string,
+    dataValue: BinaryReference,
+    allowedMimeTypes: string[],
+  ): Either.Either<UnstructuredBinary<MT>, string> {
     if (dataValue.tag === 'url') {
-      return {
+      return Either.right({
         tag: 'url',
         val: dataValue.val,
-      };
+      });
     }
 
-    return {
+    if (allowedMimeTypes.length > 0) {
+      if (!allowedMimeTypes.includes(dataValue.val.binaryType.mimeType)) {
+        return Either.left(
+          `Invalid value for parameter ${parameterName}. Mime type \`${dataValue.val.binaryType.mimeType}\` is not allowed. Allowed mime types: ${allowedMimeTypes.join(', ')}`,
+        );
+      }
+
+      return Either.right({
+        tag: 'inline',
+        val: dataValue.val.data,
+        mimeType: dataValue.val.binaryType.mimeType,
+      });
+    }
+
+    return Either.right({
       tag: 'inline',
       val: dataValue.val.data,
-      mimeType: dataValue.val.binaryType?.mimeType,
-    };
+    });
   },
 
   /**
@@ -59,7 +79,7 @@ export const UnstructuredBinary = {
    *
    * @param urlValue
    */
-  fromUrl(urlValue: string): UnstructuredBinary {
+  fromUrl(urlValue: string): UnstructuredBinary<[]> {
     return {
       tag: 'url',
       val: urlValue,
@@ -72,7 +92,10 @@ export const UnstructuredBinary = {
    * @param data
    * @param mimeType
    */
-  fromInline(data: Uint8Array, mimeType?: string): UnstructuredBinary {
+  fromInline<MT extends MimeType[] = []>(
+    data: Uint8Array,
+    mimeType?: MT[number],
+  ): UnstructuredBinary<MT> {
     return {
       tag: 'inline',
       val: data,

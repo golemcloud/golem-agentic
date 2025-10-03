@@ -289,6 +289,10 @@ function getTypeFromTsMorphInternal(
   }
 
   if (type.isUnion()) {
+    const args = tsMorphType
+      .getAliasTypeArguments()
+      .map((arg) => getTypeFromTsMorph(arg, false));
+
     const unionTypes = type
       .getUnionTypes()
       .map((t) => getTypeFromTsMorphInternal(t, false, new Set(visitedTypes)));
@@ -298,6 +302,7 @@ function getTypeFromTsMorphInternal(
       name: aliasName,
       unionTypes,
       optional: isOptional,
+      typeParams: args,
     };
   }
 
@@ -316,14 +321,22 @@ function getTypeFromTsMorphInternal(
       name: aliasName ?? rawName,
       properties: propertiesAsSymbols(type, visitedTypes),
       optional: isOptional,
+      typeParams: type
+        .getAliasTypeArguments()
+        .map((arg) => getTypeFromTsMorph(arg, false)),
     };
   }
 
   if (type.isObject()) {
+    const args = tsMorphType
+      .getAliasTypeArguments()
+      .map((arg) => getTypeFromTsMorph(arg, false));
+
     return {
       kind: "object",
       name: aliasName,
       properties: propertiesAsSymbols(type, visitedTypes),
+      typeParams: args,
       optional: isOptional,
     };
   }
@@ -346,6 +359,12 @@ function getTypeFromTsMorphInternal(
 
   if (type.isString()) {
     return { kind: "string", name: aliasName, optional: isOptional };
+  }
+
+  if (type.getTypeArguments().length === 1) {
+    throw new Error(
+      `Unhandled type with single type argument: ${type.getText()}`,
+    );
   }
 
   return {
