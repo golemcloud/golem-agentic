@@ -71,7 +71,10 @@ jobs:
         working-directory: ./golem-ts-agentic/template-golem-agent-ts
         run: |
           npm install
-          npm run dist
+          npm run dist || (
+            echo "Failed to build the base image"
+            exit 1
+          )
 
       - name: Run tests
         working-directory: ./golem-ts-agentic
