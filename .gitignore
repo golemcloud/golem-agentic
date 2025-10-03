@@ -1,12 +1,12 @@
-**/dist
 **/.idea
+**/dist
 **/golem-temp
 **/target
-node_modules
-**/node_modules
 *.iml
 .idea
+components
+node_modules
 openapi
 target
 tmp
-components
+
