@@ -41,12 +41,12 @@ import { UnstructuredText } from './newTypes/textInput';
 import { UnstructuredBinary } from './newTypes/binaryInput';
 import * as Value from './internal/mapping/values/Value';
 import * as util from 'node:util';
-import { Result } from 'golem:rpc/types@0.2.2';
 import { TypeInfoInternal } from './internal/registry/typeInfoInternal';
 import {
-  convertBinaryReferenceToElementValue,
-  convertTextReferenceToElementValue,
-} from './internal/mapping/values/elementValue';
+  deserializeDataValue,
+  ParameterDetail,
+  serializeToDataValue,
+} from './internal/mapping/values/dataValue';
 
 /**
  *
@@ -207,10 +207,8 @@ export function agent(customName?: string) {
 
     AgentTypeRegistry.register(agentClassName, agentType);
 
-    const constructorParamTypes:
-      | [string, [Type.Type, TypeInfoInternal]][]
-      | undefined = TypeMetadata.get(agentClassName.value)?.constructorArgs.map(
-      (arg) => {
+    const constructorParamTypes: ParameterDetail[] | undefined =
+      TypeMetadata.get(agentClassName.value)?.constructorArgs.map((arg) => {
         const typeInfo = AgentConstructorParamRegistry.getParamType(
           agentClassName,
           arg.name,
@@ -222,9 +220,8 @@ export function agent(customName?: string) {
           );
         }
 
-        return [arg.name, [arg.type, typeInfo]];
-      },
-    );
+        return { parameterName: arg.name, parameterTypeInfo: typeInfo };
+      });
 
     if (!constructorParamTypes) {
       throw new Error(
@@ -452,185 +449,6 @@ export function description(description: string) {
   };
 }
 
-export function deserializeDataValue(
-  dataValue: DataValue,
-  paramTypes: [string, [Type.Type, TypeInfoInternal]][],
-): Either.Either<any[], string> {
-  switch (dataValue.tag) {
-    case 'tuple':
-      const elements = dataValue.val;
-
-      return Either.all(
-        elements.map((elem, idx) => {
-          switch (elem.tag) {
-            case 'unstructured-text':
-              const [type] = paramTypes[idx][1];
-
-              const unstructuredTextParamName = paramTypes[idx][0];
-
-              const textRef = elem.val;
-
-              const languageCodes: Either.Either<string[], string> =
-                getLanguageCodes(type);
-
-              if (Either.isLeft(languageCodes)) {
-                throw new Error(
-                  `Failed to get language codes for parameter ${paramTypes[idx][0]}: ${languageCodes.val}`,
-                );
-              }
-
-              return UnstructuredText.fromDataValue(
-                unstructuredTextParamName,
-                textRef,
-                languageCodes.val,
-              );
-
-            case 'unstructured-binary':
-              const unstructuredBinaryParamName = paramTypes[idx][0];
-
-              const [binaryType] = paramTypes[idx][1];
-
-              const binaryRef = elem.val;
-
-              const mimeTypes: Either.Either<string[], string> =
-                getMimeTypes(binaryType);
-
-              if (Either.isLeft(mimeTypes)) {
-                throw new Error(
-                  `Failed to get mime types for parameter ${paramTypes[idx][0]}: ${mimeTypes.val}`,
-                );
-              }
-
-              return UnstructuredBinary.fromDataValue(
-                unstructuredBinaryParamName,
-                binaryRef,
-                mimeTypes.val,
-              );
-
-            case 'component-model':
-              const paramType = paramTypes[idx][1];
-              const typeInfo = paramType[1];
-
-              if (typeInfo.tag !== 'analysed') {
-                throw new Error(
-                  `Internal error: Unknown parameter type for ${util.format(Value.fromWitValue(elem.val))} at index ${idx}`,
-                );
-              }
-
-              const witValue = elem.val;
-              return Either.right(WitValue.toTsValue(witValue, typeInfo.val));
-          }
-        }),
-      );
-
-    case 'multimodal':
-      const multiModalElements = dataValue.val;
-
-      return Either.all(
-        multiModalElements.map(([name, elem]) => {
-          switch (elem.tag) {
-            case 'unstructured-text':
-              const nameAndType = paramTypes.find(
-                ([paramName]) => paramName === name,
-              );
-
-              if (!nameAndType) {
-                throw new Error(
-                  `Unable to process multimodal input of elem ${util.format(elem.val)}. Unknown parameter \`${name}\` in multimodal input. Available: ${paramTypes.map((p) => JSON.stringify(p)).join(', ')}`,
-                );
-              }
-
-              const [type] = nameAndType[1];
-
-              const textRef = elem.val;
-
-              const languageCodes: Either.Either<string[], string> =
-                getLanguageCodes(type);
-
-              if (Either.isLeft(languageCodes)) {
-                throw new Error(
-                  `Failed to get language codes for parameter ${name}: ${languageCodes.val}`,
-                );
-              }
-
-              return UnstructuredText.fromDataValue(
-                name,
-                textRef,
-                languageCodes.val,
-              );
-
-            case 'unstructured-binary':
-              const binaryTypeWithName = paramTypes.find(
-                ([paramName]) => paramName === name,
-              );
-
-              if (!binaryTypeWithName) {
-                throw new Error(
-                  `Unable to process multimodal input of elem ${util.format(elem.val)}. Unknown parameter \`${name}\` in multimodal input. Available: ${paramTypes.map((p) => JSON.stringify(p)).join(', ')}`,
-                );
-              }
-
-              const [binaryType] = binaryTypeWithName[1];
-
-              const binaryRef = elem.val;
-
-              const mimeTypes = getMimeTypes(binaryType);
-
-              if (Either.isLeft(mimeTypes)) {
-                throw new Error(
-                  `Failed to get mime types for parameter ${name}: ${mimeTypes.val}`,
-                );
-              }
-
-              return UnstructuredBinary.fromDataValue(
-                name,
-                binaryRef,
-                mimeTypes.val,
-              );
-
-            case 'component-model':
-              const witValue = elem.val;
-
-              const param = paramTypes.find(
-                ([paramName]) => paramName === name,
-              );
-
-              if (!param) {
-                throw new Error(
-                  `Unable to process multimodal input of elem ${util.format(Value.fromWitValue(elem.val))}. Unknown parameter \`${name}\` in multimodal input. Available: ${paramTypes.map((p) => JSON.stringify(p)).join(', ')}`,
-                );
-              }
-
-              const paramType = param[1];
-              const typeInfo = paramType[1];
-
-              if (typeInfo.tag !== 'analysed') {
-                throw new Error(
-                  `Internal error: Unknown parameter type for multimodal input ${util.format(Value.fromWitValue(elem.val))} with name ${name}`,
-                );
-              }
-
-              return Either.right(WitValue.toTsValue(witValue, typeInfo.val));
-          }
-        }),
-      );
-  }
-}
-
-export function getDataValueFromReturnValueWit(
-  witValue: WitValue.WitValue,
-): DataValue {
-  return {
-    tag: 'tuple',
-    val: [
-      {
-        tag: 'component-model',
-        val: witValue,
-      },
-    ],
-  };
-}
-
 function getAgentInternal(
   agentInstance: any,
   agentClassName: AgentClassName,
@@ -669,19 +487,6 @@ function getAgentInternal(
           `Method ${methodName} not found on agent ${agentClassName.value}`,
         );
 
-      const agentTypeOpt = AgentTypeRegistry.get(agentClassName);
-
-      if (Option.isNone(agentTypeOpt)) {
-        const error: AgentError = {
-          tag: 'invalid-method',
-          val: `Agent type ${agentClassName} not found in registry.`,
-        };
-        return {
-          tag: 'err',
-          val: error,
-        };
-      }
-
       const methodParams = TypeMetadata.get(agentClassName.value)?.methods.get(
         methodName,
       )?.methodParams;
@@ -700,7 +505,6 @@ function getAgentInternal(
       const methodParamTypes = Array.from(methodParams.entries()).map(
         (param) => {
           const paramName = param[0];
-          const paramType = param[1];
 
           const paramTypeInfo = AgentMethodParamRegistry.getParamType(
             agentClassName,
@@ -710,14 +514,11 @@ function getAgentInternal(
 
           if (!paramTypeInfo) {
             throw new Error(
-              `Unsupported type for parameter ${paramName} in method ${methodName} of agent ${agentClassName.value}`,
+              `Internal error: Unsupported parameter ${paramName} in method ${methodName} of agent ${agentClassName.value}`,
             );
           }
 
-          return [paramName, [paramType, paramTypeInfo]] as [
-            string,
-            [Type.Type, TypeInfoInternal],
-          ];
+          return { parameterName: paramName, parameterTypeInfo: paramTypeInfo };
         },
       );
 
@@ -741,6 +542,19 @@ function getAgentInternal(
         deserializedArgs.val,
       );
 
+      const agentTypeOpt = AgentTypeRegistry.get(agentClassName);
+
+      if (Option.isNone(agentTypeOpt)) {
+        const error: AgentError = {
+          tag: 'invalid-method',
+          val: `Agent type ${agentClassName} not found in registry.`,
+        };
+        return {
+          tag: 'err',
+          val: error,
+        };
+      }
+
       const methodSignature = agentTypeOpt.val.methods.find(
         (m) => m.name === methodName,
       );
@@ -757,7 +571,7 @@ function getAgentInternal(
         };
       }
 
-      const returnTypeAnalysed = AgentMethodRegistry.lookupReturnType(
+      const returnTypeAnalysed = AgentMethodRegistry.getReturnType(
         agentClassName,
         methodName,
       );
@@ -774,61 +588,27 @@ function getAgentInternal(
         };
       }
 
-      switch (returnTypeAnalysed.tag) {
-        case 'analysed':
-          const returnValue = WitValue.fromTsValue(
-            methodResult,
-            returnTypeAnalysed.val,
-          );
+      // Converting the result from method back to data-value
+      const dataValueEither = serializeToDataValue(
+        methodResult,
+        returnTypeAnalysed,
+      );
 
-          if (Either.isLeft(returnValue)) {
-            const agentError: AgentError = {
-              tag: 'invalid-type',
-              val: `Failed to serialize the return value from ${methodName}: ${returnValue.val}`,
-            };
+      if (Either.isLeft(dataValueEither)) {
+        const agentError = createCustomError(
+          `Failed to serialize the return value from ${methodName}: ${dataValueEither.val}`,
+        );
 
-            return {
-              tag: 'err',
-              val: agentError,
-            };
-          }
-
-          return {
-            tag: 'ok',
-            val: getDataValueFromReturnValueWit(returnValue.val),
-          };
-        case 'unstructured-text':
-          const unstructuredText =
-            convertTextReferenceToElementValue(methodResult);
-
-          const unstructuredTextValue: DataValue = {
-            tag: 'tuple',
-            val: [unstructuredText],
-          };
-
-          const dataValueResultText: Result<DataValue, AgentError> = {
-            tag: 'ok',
-            val: unstructuredTextValue,
-          };
-
-          return dataValueResultText;
-
-        case 'unstructured-binary':
-          const unstructuredBinary =
-            convertBinaryReferenceToElementValue(methodResult);
-
-          const unstructuredBinaryValue: DataValue = {
-            tag: 'tuple',
-            val: [unstructuredBinary],
-          };
-
-          const dataValueResult: Result<DataValue, AgentError> = {
-            tag: 'ok',
-            val: unstructuredBinaryValue,
-          };
-
-          return dataValueResult;
+        return {
+          tag: 'err',
+          val: agentError,
+        };
       }
+
+      return {
+        tag: 'ok',
+        val: dataValueEither.val,
+      };
     },
   };
 }

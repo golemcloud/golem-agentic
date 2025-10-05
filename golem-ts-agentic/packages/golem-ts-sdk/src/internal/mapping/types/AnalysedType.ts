@@ -17,7 +17,7 @@ import * as Either from "../../../newTypes/either";
 import * as Option from "../../../newTypes/option";
 import { TypeMappingScope } from './scope';
 import { generateVariantCaseName } from './name';
-import { convertOptionalTypeNameToKebab, isKebabCase, isNumberString, trimQuotes } from './string-format';
+import { convertOptionalTypeNameToKebab, isKebabCase, isNumberString, trimQuotes } from './stringFormat';
 import { getTaggedUnion, getUnionOfLiterals, TaggedTypeMetadata, UserDefinedResultType } from './taggedUnion';
 
 type TsType = CoreType.Type;
@@ -249,7 +249,7 @@ export function fromTsType(tsType: TsType, scope: Option.Option<TypeMappingScope
   const result =
     fromTsTypeInternal(tsType, scope);
 
-  if (Option.isSome(scope) && TypeMappingScope.isQuestionMarkOptionalParam(scope.val)) {
+  if (Option.isSome(scope) && TypeMappingScope.isOptional(scope.val)) {
     return Either.map(result, (analysedType) => {
 
       if (analysedType.kind === 'option' && analysedType.emptyType !== 'question-mark') {
@@ -397,7 +397,7 @@ export function fromTsTypeInternal(type: TsType, scope: Option.Option<TypeMappin
         }
 
         // Type is already optional and further loop will solve it
-        if ((Option.isSome(scope) && TypeMappingScope.isQuestionMarkOptionalParam(scope.val))) {
+        if ((Option.isSome(scope) && TypeMappingScope.isOptional(scope.val))) {
           const innerType = innerTypeEither.val;
 
           if (!type.name){
