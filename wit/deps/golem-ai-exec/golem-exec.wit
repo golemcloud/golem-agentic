@@ -3,10 +3,13 @@ package golem:exec@1.0.0;
 interface types {
   /// Supported language types and optional version
   record language {
+    /// The language to use
     kind: language-kind,
+    /// Optionally further narrow down the language version
     version: option<string>,
   }
 
+  /// Supported languages
   enum language-kind {
     javascript,
     python,
@@ -21,54 +24,75 @@ interface types {
 
   /// Code or data file
   record file {
+    /// File name
     name: string,
+    /// Raw file contents
     content: list<u8>,
-    encoding: option<encoding>, // defaults to utf8
+    /// Encoding of `content`, defaults to `utf8`
+    encoding: option<encoding>,
   }
 
   /// Resource limits
   record limits {
+    /// Limit the execution time, in milliseconds
     time-ms: option<u64>,
+    /// Limit the memory usage, in bytes
     memory-bytes: option<u64>,
+    /// Limit the maximum file size, in bytes
     file-size-bytes: option<u64>,
+    /// Limit the number of spawned processes
     max-processes: option<u32>,
   }
 
   /// Execution outcome per stage
   record stage-result {
+    /// Standard output
     stdout: string,
+    /// Standard error output
     stderr: string,
+    /// Exit code of the process, if any
     exit-code: option<s32>,
+    /// Signal that caused the process to terminate, if any
     signal: option<string>,
   }
 
   /// Complete execution result
   record exec-result {
+    /// Result of the compilation stage, if any
     compile: option<stage-result>,
+    /// Result of the execution stage
     run: stage-result,
+    /// Execution time in milliseconds
     time-ms: option<u64>,
+    /// Consumed memory in bytes
     memory-bytes: option<u64>,
   }
 
   /// Execution error types
   variant error {
+    /// The chosen langauge is not supported
     unsupported-language,
+    /// Compilation failed
     compilation-failed(stage-result),
+    /// Execution failed
     runtime-failed(stage-result),
+    /// Timed out
     timeout,
+    /// Resource limits exceeded
     resource-exceeded,
+    /// Internal execution error
     internal(string),
   }
 
   /// Options for controlling the script runner environment
-  /// - `stdin` is optional input to provide to the program.
-  /// - `args` are command line arguments passed to the program.
-  /// - `env` is a list of environment variables to set for the execution.
-  /// - `limits` are optional resource limits for the execution.
   record run-options {
+    /// optional input to provide to the program.
     stdin: option<string>,
+    /// command line arguments passed to the program
     args: option<list<string>>,
+    /// a list of environment variables to set for the execution
     env: option<list<tuple<string, string>>>,
+    /// optional resource limits for the execution
     limits: option<limits>
   }
 }
