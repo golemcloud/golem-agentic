@@ -129,7 +129,7 @@ interface core {
   resource search-stream {
     get-next: func() -> option<list<search-hit>>;
     blocking-get-next: func() -> list<search-hit>;
-  } 
+  }
 
   // Query
   search: func(index: index-name, query: search-query) -> result<search-results, search-error>;
