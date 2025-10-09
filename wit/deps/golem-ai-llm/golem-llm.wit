@@ -265,9 +265,9 @@ interface llm {
   /// Represents an ongoing streaming LLM conversation
   resource chat-stream {
     /// Polls for the next chunk of stream events
-    poll-next: func() -> result<option<list<stream-event>>, error>;
+    poll-next: func() -> option<list<result<stream-event, error>>>;
     /// Blocks until the next chunk of stream events is available
-    get-next: func() -> result<list<stream-event>, error>;
+    get-next: func() -> list<result<stream-event, error>>;
   }
 
   // --- Core Functions ---
