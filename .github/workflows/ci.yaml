@@ -7,6 +7,9 @@ on:
       - main
   pull_request:
 
+env:
+  WASM_RQUICKJS_VERSION: "0.0.20"
+
 jobs:
   build-ts-agentic:
     runs-on: blacksmith
@@ -30,7 +33,7 @@ jobs:
         run: cargo binstall --force cargo-component@0.21.1
 
       - name: Install wasm-rquickjs
-        run: cargo install wasm-rquickjs-cli
+        run: cargo install wasm-rquickjs-cli --version $WASM_RQUICKJS_VERSION
 
       - name: Install dependencies
         working-directory: ./golem-ts-agentic
@@ -96,7 +99,7 @@ jobs:
         run: rustup update stable --no-self-update && rustup default stable
 
       - name: Install wasm-rquickjs
-        run: cargo install wasm-rquickjs-cli
+        run: cargo install wasm-rquickjs-cli --version $WASM_RQUICKJS_VERSION
 
       - uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-component
