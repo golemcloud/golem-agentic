@@ -1,6 +1,5 @@
-use crate::bindings::exports::golem::agent::guest::{AgentType, StatusUpdate};
+use crate::bindings::golem::agent::common::{AgentType, DataValue};
 use golem_wasm_rpc::WitValue;
-use crate::AgentConstruct;
 
 // A simple Agent that every agent abstraction has to extend
 // This is auto implemented when using `agent_implementation` attribute.
@@ -26,7 +25,7 @@ use crate::AgentConstruct;
 // There is no need to implement `Agent` anywhere, as it is automatically implemented by the `[agent_implementation]` attribute.
 pub trait Agent: Send + Sync {
     fn get_id(&self) -> String;
-    fn invoke(&self, method_name: String, input: Vec<WitValue>) -> StatusUpdate;
+    fn invoke(&self, method_name: String, input: DataValue) -> DataValue;
     fn get_definition(&self) -> AgentType;
 }
 
