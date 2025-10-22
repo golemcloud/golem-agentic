@@ -11,7 +11,10 @@ crate-type = ["rlib"]
 path = "src/lib.rs"
 
 [dependencies]
+golem-agentic-macros = { path = "../agentic-macros", version = "0.0.0", default-features = false }
 ctor = "0.4.2"
+
+# same dependency as in golem-rust to avoid conflicts when moving to golemr epo
 golem-wasm-rpc = {version = "1.3.0-rc9pre", default-features = false, features = [
   "stub", "typeinfo"
 ]}
