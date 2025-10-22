@@ -10,11 +10,6 @@ description = "Macros of agentic SDK helps write golem components with zero know
 proc-macro = true
 
 [dependencies]
-golem-agentic = { path = "../agentic", version = "0.0.0", default-features = false }
-
-golem-wasm-rpc = { git =  "https://github.com/golemcloud/golem.git", branch = "code_first_agent",  default-features = false, features = ["typeinfo"] }
-golem-wasm-ast = {  git =  "https://github.com/golemcloud/golem.git", branch = "code_first_agent", default-features = false, features = ["analysis",  "json"] }
-
 syn = { version = "2", features = ["full"] }
 quote = "1"
 proc-macro2 = "1.0.94"

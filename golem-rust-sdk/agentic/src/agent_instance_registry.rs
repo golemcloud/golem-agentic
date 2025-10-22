@@ -1,3 +1,4 @@
+use crate::bindings::golem::api1_1_7::host;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -25,14 +26,12 @@ pub fn increment_agent_instance_counter(agent_name: AgentName) -> u64 {
     increment_agent_instance_counter_locked(&mut counter, &agent_name)
 }
 
+// To be changed to use the host function that creates the agent id
 pub fn create_agent_id(agent_name: AgentName) -> AgentId {
     let mut counter = AGENT_INSTANCE_COUNTER.lock().unwrap();
     let count = increment_agent_instance_counter_locked(&mut counter, &agent_name);
 
-    let worker_name = crate::bindings::golem::api::host::get_self_metadata()
-        .worker_id
-        .worker_name
-        .clone();
+    let worker_name = host::get_self_metadata().agent_id;
 
     let agent_id = format!("{}--{}--{}", worker_name, agent_name, count);
 
