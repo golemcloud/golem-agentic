@@ -1,9 +1,9 @@
 /**
  * Host interface for enumerating and searching for agent oplogs
  */
-declare module 'golem:api/oplog@1.1.7' {
-  import * as golemApi117Context from 'golem:api/context@1.1.7';
-  import * as golemApi117Host from 'golem:api/host@1.1.7';
+declare module 'golem:api/oplog@1.3.0' {
+  import * as golemApi130Context from 'golem:api/context@1.3.0';
+  import * as golemApi130Host from 'golem:api/host@1.3.0';
   import * as golemRpc022Types from 'golem:rpc/types@0.2.2';
   import * as wasiClocks023WallClock from 'wasi:clocks/wall-clock@0.2.3';
   export class GetOplog {
@@ -15,19 +15,19 @@ declare module 'golem:api/oplog@1.1.7' {
     getNext(): [OplogIndex, OplogEntry][] | undefined;
   }
   export type Datetime = wasiClocks023WallClock.Datetime;
-  export type WitValue = golemRpc022Types.WitValue;
-  export type AccountId = golemApi117Host.AccountId;
-  export type ComponentVersion = golemApi117Host.ComponentVersion;
-  export type OplogIndex = golemApi117Host.OplogIndex;
-  export type PersistenceLevel = golemApi117Host.PersistenceLevel;
-  export type ProjectId = golemApi117Host.ProjectId;
-  export type RetryPolicy = golemApi117Host.RetryPolicy;
-  export type Uuid = golemApi117Host.Uuid;
-  export type AgentId = golemApi117Host.AgentId;
-  export type Attribute = golemApi117Context.Attribute;
-  export type AttributeValue = golemApi117Context.AttributeValue;
-  export type SpanId = golemApi117Context.SpanId;
-  export type TraceId = golemApi117Context.TraceId;
+  export type ValueAndType = golemRpc022Types.ValueAndType;
+  export type AccountId = golemApi130Host.AccountId;
+  export type ComponentVersion = golemApi130Host.ComponentVersion;
+  export type OplogIndex = golemApi130Host.OplogIndex;
+  export type PersistenceLevel = golemApi130Host.PersistenceLevel;
+  export type ProjectId = golemApi130Host.ProjectId;
+  export type RetryPolicy = golemApi130Host.RetryPolicy;
+  export type Uuid = golemApi130Host.Uuid;
+  export type AgentId = golemApi130Host.AgentId;
+  export type Attribute = golemApi130Context.Attribute;
+  export type AttributeValue = golemApi130Context.AttributeValue;
+  export type SpanId = golemApi130Context.SpanId;
+  export type TraceId = golemApi130Context.TraceId;
   export type WrappedFunctionType = 
   /**
    * The side-effect reads from the agent's local state (for example local file system,
@@ -82,12 +82,13 @@ declare module 'golem:api/oplog@1.1.7' {
     componentSize: bigint;
     initialTotalLinearMemorySize: bigint;
     initialActivePlugins: PluginInstallationDescription[];
+    configVars: [string, string][];
   };
   export type ImportedFunctionInvokedParameters = {
     timestamp: Datetime;
     functionName: string;
-    request: WitValue;
-    response: WitValue;
+    request: ValueAndType;
+    response: ValueAndType;
     wrappedFunctionType: WrappedFunctionType;
   };
   export type LocalSpanData = {
@@ -114,7 +115,7 @@ declare module 'golem:api/oplog@1.1.7' {
   export type ExportedFunctionInvokedParameters = {
     timestamp: Datetime;
     functionName: string;
-    request: WitValue[];
+    request: ValueAndType[];
     idempotencyKey: string;
     traceId: TraceId;
     traceStates: string[];
@@ -126,21 +127,25 @@ declare module 'golem:api/oplog@1.1.7' {
   };
   export type ExportedFunctionCompletedParameters = {
     timestamp: Datetime;
-    response?: WitValue;
+    response?: ValueAndType;
     consumedFuel: bigint;
   };
   export type ErrorParameters = {
     timestamp: Datetime;
     error: string;
+    retryFrom: OplogIndex;
   };
-  export type JumpParameters = {
-    timestamp: Datetime;
+  export type OplogRegion = {
     start: OplogIndex;
     end: OplogIndex;
   };
+  export type JumpParameters = {
+    timestamp: Datetime;
+    jump: OplogRegion;
+  };
   export type ChangeRetryPolicyParameters = {
     timestamp: Datetime;
-    retryPolicy: RetryPolicy;
+    newPolicy: RetryPolicy;
   };
   export type EndAtomicRegionParameters = {
     timestamp: Datetime;
@@ -153,7 +158,14 @@ declare module 'golem:api/oplog@1.1.7' {
   export type ExportedFunctionInvocationParameters = {
     idempotencyKey: string;
     functionName: string;
-    input?: WitValue[];
+    input?: ValueAndType[];
+    traceId: string;
+    traceStates: string[];
+    /**
+     * The first one is the invocation context stack associated with the exported function invocation,
+     * and further stacks can be added that are referenced by the `linked-context` field of `local-span-data`
+     */
+    invocationContext: SpanData[][];
   };
   export type AgentInvocation = 
   {
@@ -264,6 +276,9 @@ declare module 'golem:api/oplog@1.1.7' {
     timestamp: Datetime;
     beginIndex: OplogIndex;
   };
+  export type Timestamp = {
+    timestamp: Datetime;
+  };
   export type OplogEntry = 
   /** The initial agent oplog entry */
   {
@@ -288,7 +303,7 @@ declare module 'golem:api/oplog@1.1.7' {
   /** Agent suspended */
   {
     tag: 'suspend'
-    val: Datetime
+    val: Timestamp
   } |
   /** Agent failed */
   {
@@ -301,7 +316,7 @@ declare module 'golem:api/oplog@1.1.7' {
    */
   {
     tag: 'no-op'
-    val: Datetime
+    val: Timestamp
   } |
   /**
    * The agent needs to recover up to the given target oplog index and continue running from
@@ -319,12 +334,12 @@ declare module 'golem:api/oplog@1.1.7' {
    */
   {
     tag: 'interrupted'
-    val: Datetime
+    val: Timestamp
   } |
   /** Indicates that the agent has been exited using WASI's exit function. */
   {
     tag: 'exited'
-    val: Datetime
+    val: Timestamp
   } |
   /** Overrides the agent's retry policy */
   {
@@ -337,7 +352,7 @@ declare module 'golem:api/oplog@1.1.7' {
    */
   {
     tag: 'begin-atomic-region'
-    val: Datetime
+    val: Timestamp
   } |
   /**
    * Ends an atomic region. All oplog entries between the corresponding `BeginAtomicRegion` and this
@@ -355,7 +370,7 @@ declare module 'golem:api/oplog@1.1.7' {
    */
   {
     tag: 'begin-remote-write'
-    val: Datetime
+    val: Timestamp
   } |
   /** Marks the end of a remote write operation. Only used when idempotence mode is off. */
   {
@@ -405,7 +420,7 @@ declare module 'golem:api/oplog@1.1.7' {
   /** The agent's has been restarted, forgetting all its history */
   {
     tag: 'restart'
-    val: Datetime
+    val: Timestamp
   } |
   /** Activates a plugin */
   {
