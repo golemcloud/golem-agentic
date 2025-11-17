@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { AgentType, DataValue, AgentError } from 'golem:agent/common';
+import {
+  AgentType,
+  DataValue,
+  AgentError,
+  AgentMode,
+} from 'golem:agent/common';
 import { AgentInternal } from './internal/agentInternal';
 import { ResolvedAgent } from './internal/resolvedAgent';
 import { TypeMetadata } from '@golemcloud/golem-ts-types-core';
@@ -43,7 +48,7 @@ import {
 /**
  *
  * The `@agent()` decorator: Marks a class as an Agent, and registers itself internally for discovery by other agents.
- * The agent-anem is derived from the class name in kebab-case by default, but can be overridden by passing a custom name to the decorator.
+ * The agent-name is the class name by default, but can be overridden by passing a custom name to the decorator.
  *
  * It also adds a static `get()` method to the class, which can be used to create a remote client for the agent.
  *
@@ -51,14 +56,33 @@ import {
  *
  * ### Naming of agents
  * By default, the agent name is the class name. When using the agent through
- * Golem's CLI, these names are converted to kebab-case.
+ * Golem's CLI, these names must be provided in kebab-case.
  *
  * Example:
  * ```ts
  * @agent()
  * class WeatherAgent {} // -> "weather-agent"
  * ```
- * You can override the name using explicit metadata.
+ * You can override the name using the `name` option.
+ *
+ * ### Durability mode
+ * By default, agents are durable. You can specify the durability mode using the optional parameter:
+ * ```ts
+ * @agent({ mode: "ephemeral" })
+ * class EphemeralAgent extends BaseAgent { ... }
+ * ```
+ * Valid modes are "durable" (default) and "ephemeral".
+ *
+ * ### Options
+ * The decorator accepts an optional configuration object with the following fields:
+ * - `name`: Custom agent name (default: class name)
+ * - `mode`: Agent durability mode, either "durable" or "ephemeral" (default: "durable")
+ *
+ * Example:
+ * ```ts
+ * @agent({ name: "weather-api", mode: "durable" })
+ * class WeatherAgent extends BaseAgent { ... }
+ * ```
  *
  * ### Metadata
  * Prompt and description are **recommended** so that other agents can decide whether to interact with this agent.
@@ -117,7 +141,12 @@ import {
  * calcRemote.add(5);
  * ```
  */
-export function agent(customName?: string) {
+interface AgentDecoratorOptions {
+  name?: string;
+  mode?: AgentMode;
+}
+
+export function agent(options?: AgentDecoratorOptions) {
   return function <T extends new (...args: any[]) => any>(ctor: T) {
     if (!Object.prototype.isPrototypeOf.call(BaseAgent, ctor)) {
       throw new Error(
@@ -167,7 +196,7 @@ export function agent(customName?: string) {
     const methods = methodSchemaEither.val;
 
     const agentTypeName = new AgentClassName(
-      customName || agentClassName.value,
+      options?.name || agentClassName.value,
     );
 
     if (AgentInitiatorRegistry.exists(agentTypeName.value)) {
@@ -201,6 +230,7 @@ export function agent(customName?: string) {
       },
       methods,
       dependencies: [],
+      mode: options?.mode ?? 'durable',
     };
 
     AgentTypeRegistry.register(agentClassName, agentType);
