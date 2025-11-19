@@ -23,7 +23,6 @@ import {
   TextDescriptor,
 } from 'golem:agent/common';
 import * as WitType from './mapping/types/WitType';
-import { AgentClassName } from '../newTypes/agentClassName';
 import { AgentMethodRegistry } from './registry/agentMethodRegistry';
 import {
   ClassMetadata,
@@ -40,10 +39,11 @@ import {
   tuple,
 } from './mapping/types/AnalysedType';
 import { TypeInfoInternal } from './registry/typeInfoInternal';
-import { convertVariantTypeNameToKebab } from './mapping/types/name';
+import { convertVariantTypeNameToKebab } from './mapping/types/stringFormat';
+import { ParameterDetail } from './mapping/values/dataValue';
 
 export function getConstructorDataSchema(
-  agentClassName: AgentClassName,
+  agentClassName: string,
   classType: ClassMetadata,
 ): Either.Either<DataSchema, string> {
   const constructorParamInfos: readonly ConstructorArg[] =
@@ -60,10 +60,7 @@ export function getConstructorDataSchema(
       const multimodalTypes: Type.Type[] =
         elementType.kind === 'union' ? elementType.unionTypes : [elementType];
 
-      const multiModalDetails = getMultimodalDetails(
-        agentClassName,
-        multimodalTypes,
-      );
+      const multiModalDetails = getMultimodalDetails(multimodalTypes);
 
       if (Either.isLeft(multiModalDetails)) {
         return Either.left(
@@ -71,8 +68,13 @@ export function getConstructorDataSchema(
         );
       }
 
-      const typeInfoInternals = multiModalDetails.val.map(
-        ([name, , typeInfo]) => [name, typeInfo] as [string, TypeInfoInternal],
+      const typeInfoInternals: ParameterDetail[] = multiModalDetails.val.map(
+        ([name, , typeInfo]) => {
+          return {
+            name: name,
+            type: typeInfo,
+          };
+        },
       );
 
       const schemaDetails = multiModalDetails.val.map(
@@ -112,12 +114,10 @@ export function getConstructorDataSchema(
 
 export function getAgentMethodSchema(
   classMetadata: ClassMetadata,
-  agentClassName: AgentClassName,
+  agentClassName: string,
 ): Either.Either<AgentMethod[], string> {
   if (!classMetadata) {
-    return Either.left(
-      `No metadata found for agent class ${agentClassName.value}`,
-    );
+    return Either.left(`No metadata found for agent class ${agentClassName}`);
   }
 
   const methodMetadata = Array.from(classMetadata.methods.entries());
@@ -149,7 +149,7 @@ export function getAgentMethodSchema(
       const outputSchemaEither: Either.Either<
         [TypeDetails, DataSchema],
         string
-      > = buildOutputSchema(agentClassName, returnType);
+      > = buildOutputSchema(returnType);
 
       if (Either.isLeft(outputSchemaEither)) {
         return Either.left(
@@ -240,7 +240,7 @@ export function getAgentMethodSchema(
 }
 
 export function buildMethodInputSchema(
-  agentClassName: AgentClassName,
+  agentClassName: string,
   methodName: string,
   paramTypes: MethodParams,
 ): Either.Either<DataSchema, string> {
@@ -258,10 +258,7 @@ export function buildMethodInputSchema(
       const multimodalTypes =
         elementType.kind === 'union' ? elementType.unionTypes : [elementType];
 
-      const multiModalDetails = getMultimodalDetails(
-        agentClassName,
-        multimodalTypes,
-      );
+      const multiModalDetails = getMultimodalDetails(multimodalTypes);
 
       if (Either.isLeft(multiModalDetails)) {
         return Either.left(
@@ -269,8 +266,13 @@ export function buildMethodInputSchema(
         );
       }
 
-      const typeInfoInternals = multiModalDetails.val.map(
-        ([name, , typeInfo]) => [name, typeInfo] as [string, TypeInfoInternal],
+      const typeInfoInternals: ParameterDetail[] = multiModalDetails.val.map(
+        ([name, , typeInfo]) => {
+          return {
+            name: name,
+            type: typeInfo,
+          };
+        },
       );
 
       const schemaDetails = multiModalDetails.val.map(
@@ -295,62 +297,48 @@ export function buildMethodInputSchema(
     } else {
       return Either.left('Multimodal type is not an array');
     }
-  }
-
-  const result = Either.all(
-    paramTypesArray.map((parameterInfo) =>
-      Either.mapBoth(
-        convertToElementSchema(
-          agentClassName,
-          methodName,
-          parameterInfo[0],
-          parameterInfo[1],
-          Option.some(
-            TypeMappingScope.method(
-              methodName,
-              parameterInfo[0],
-              parameterInfo[1].optional,
+  } else {
+    const result = Either.all(
+      paramTypesArray.map((parameterInfo) =>
+        Either.mapBoth(
+          convertToElementSchema(
+            agentClassName,
+            methodName,
+            parameterInfo[0],
+            parameterInfo[1],
+            Option.some(
+              TypeMappingScope.method(
+                methodName,
+                parameterInfo[0],
+                parameterInfo[1].optional,
+              ),
             ),
           ),
+          (result) => {
+            return [parameterInfo[0], result] as [string, ElementSchema];
+          },
+          (err) =>
+            `Method: \`${methodName}\`, Parameter: \`${parameterInfo[0]}\`. Error: ${err}`,
         ),
-        (result) => {
-          return [parameterInfo[0], result] as [string, ElementSchema];
-        },
-        (err) =>
-          `Method: \`${methodName}\`, Parameter: \`${parameterInfo[0]}\`. Error: ${err}`,
       ),
-    ),
-  );
+    );
 
-  const agentClass = AgentMethodRegistry.get(agentClassName);
-
-  const isMultiModal = agentClass?.get(methodName)?.multimodal ?? false;
-
-  if (isMultiModal) {
     return Either.map(result, (res) => {
       return {
-        tag: 'multimodal',
+        tag: 'tuple',
         val: res,
       };
     });
   }
-
-  return Either.map(result, (res) => {
-    return {
-      tag: 'tuple',
-      val: res,
-    };
-  });
 }
 
 type TypeDetails =
   | { tag: 'analysed'; val: AnalysedType }
-  | { tag: 'multimodal'; val: [string, TypeInfoInternal][] }
+  | { tag: 'multimodal'; val: ParameterDetail[] }
   | { tag: 'unstructured-text' }
   | { tag: 'unstructured-binary' };
 
 export function buildOutputSchema(
-  agentClassName: AgentClassName,
   returnType: Type.Type,
 ): Either.Either<[TypeDetails, DataSchema], string> {
   const multiModalTarget =
@@ -370,10 +358,7 @@ export function buildOutputSchema(
     const multimodalTypes =
       elementType.kind === 'union' ? elementType.unionTypes : [elementType];
 
-    const multiModalDetails = getMultimodalDetails(
-      agentClassName,
-      multimodalTypes,
-    );
+    const multiModalDetails = getMultimodalDetails(multimodalTypes);
 
     if (Either.isLeft(multiModalDetails)) {
       return Either.left(
@@ -381,8 +366,13 @@ export function buildOutputSchema(
       );
     }
 
-    const multiModalTypeInfos = multiModalDetails.val.map(
-      ([name, , typeInfo]) => [name, typeInfo] as [string, TypeInfoInternal],
+    const multiModalTypeInfos: ParameterDetail[] = multiModalDetails.val.map(
+      ([name, , typeInfo]) => {
+        return {
+          name: name,
+          type: typeInfo,
+        };
+      },
     );
 
     const schemaDetails = multiModalDetails.val.map(
@@ -484,7 +474,6 @@ export function buildOutputSchema(
 }
 
 function getMultimodalDetails(
-  agentClassName: AgentClassName,
   types: Type.Type[],
 ): Either.Either<[string, ElementSchema, TypeInfoInternal][], string> {
   return Either.all(
@@ -573,7 +562,7 @@ function getMultimodalDetails(
 }
 
 function getParameterNameAndElementSchema(
-  agentClassName: AgentClassName,
+  agentClassName: string,
   constructorParamInfos: readonly ConstructorArg[],
 ): Either.Either<[string, ElementSchema][], string> {
   return Either.all(
@@ -632,7 +621,7 @@ function getParameterNameAndElementSchema(
         paramInfo.type,
         Option.some(
           TypeMappingScope.constructor(
-            agentClassName.value,
+            agentClassName,
             paramInfo.name,
             paramInfo.type.optional,
           ),
@@ -702,7 +691,7 @@ function handleUnstructuredCase(
 }
 
 function convertToElementSchema(
-  agentClassName: AgentClassName,
+  agentClassName: string,
   methodName: string,
   parameterName: string,
   parameterType: Type.Type,

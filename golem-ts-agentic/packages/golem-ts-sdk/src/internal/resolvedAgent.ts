@@ -12,56 +12,255 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { AgentError, AgentType, DataValue } from 'golem:agent/common';
 import { Result } from 'golem:rpc/types@0.2.2';
-import { AgentInternal } from './agentInternal';
+import { AgentError, AgentType, DataValue } from 'golem:agent/common';
 import { AgentId } from '../agentId';
-import { AgentTypeRegistry } from './registry/agentTypeRegistry';
-import * as Option from '../newTypes/option';
-import * as AgentClassName from '../newTypes/agentClassName';
+import { AgentClassName } from '../newTypes/agentClassName';
+import { BaseAgent } from '../baseAgent';
+import {
+  AgentMethodParamMetadata,
+  AgentMethodParamRegistry,
+} from './registry/agentMethodParamRegistry';
+import {
+  deserializeDataValue,
+  ParameterDetail,
+  serializeToDataValue,
+} from './mapping/values/dataValue';
+import * as Either from '../newTypes/either';
+import {
+  AgentMethodMetadata,
+  AgentMethodRegistry,
+} from './registry/agentMethodRegistry';
+import {
+  createCustomError,
+  invalidInput,
+  invalidMethod,
+  invalidType,
+} from './agentError';
+import { TypeInfoInternal } from './registry/typeInfoInternal';
+import { Uuid } from 'golem:agent/host';
 
+/**
+ * An AgentInternal is an internal interface that represents the basic usage of an agent
+ * It is constructed only after instantiating of an agent through the AgentInitiator.
+ */
 export class ResolvedAgent {
-  readonly classInstance: any;
-  private agentInternal: AgentInternal;
-  private readonly agentClassName: AgentClassName.AgentClassName;
+  private readonly agentInstance: BaseAgent;
+  private readonly agentClassName: AgentClassName;
+  private readonly uniqueAgentId: AgentId;
+  private readonly constructorInput: DataValue;
+
+  private parameterMetadata:
+    | Map<string, Map<string, AgentMethodParamMetadata>>
+    | undefined = undefined;
+  private methodMetadata: Map<string, AgentMethodMetadata> | undefined =
+    undefined;
+  private readonly cachedMethodInfo: Map<string, CachedMethodInfo> = new Map();
 
   constructor(
-    agentClassName: AgentClassName.AgentClassName,
-    tsAgentInternal: AgentInternal,
-    originalInstance: any,
+    agentInstance: BaseAgent,
+    agentClassName: AgentClassName,
+    uniqueAgentId: AgentId,
+    constructorInput: DataValue,
   ) {
+    this.agentInstance = agentInstance;
     this.agentClassName = agentClassName;
-    this.agentInternal = tsAgentInternal;
-    this.classInstance = originalInstance;
+    this.uniqueAgentId = uniqueAgentId;
+    this.constructorInput = constructorInput;
   }
 
   getId(): AgentId {
-    return this.agentInternal.getId();
+    return this.uniqueAgentId;
+  }
+
+  phantomId(): Uuid | undefined {
+    const [_typeName, _params, phantomId] = this.uniqueAgentId.parsed();
+    return phantomId;
   }
 
   getParameters(): DataValue {
-    return this.agentInternal.getParameters();
+    return this.constructorInput;
   }
 
-  invoke(
-    methodName: string,
-    args: DataValue,
-  ): Promise<Result<DataValue, AgentError>> {
-    return this.agentInternal.invoke(methodName, args);
-  }
-
-  getDefinition(): AgentType {
-    return Option.getOrThrowWith(
-      AgentTypeRegistry.get(this.agentClassName),
-      () => new Error(`Agent class ${this.agentClassName} is not registered.`),
-    );
-  }
-
-  saveSnapshot(): Promise<Uint8Array> {
-    return this.agentInternal.saveSnapshot();
+  getAgentType(): AgentType {
+    return this.agentInstance.getAgentType();
   }
 
   loadSnapshot(bytes: Uint8Array): Promise<void> {
-    return this.agentInternal.loadSnapshot(bytes);
+    return this.agentInstance.loadSnapshot(bytes);
+  }
+
+  async saveSnapshot(): Promise<Uint8Array> {
+    return await this.agentInstance.saveSnapshot();
+  }
+
+  async invoke(
+    methodName: string,
+    methodArgs: DataValue,
+  ): Promise<Result<DataValue, AgentError>> {
+    const methodInfoResult = this.getCachedMethodInfo(methodName);
+    if (methodInfoResult.tag === 'err') {
+      return methodInfoResult;
+    }
+    const methodInfo = methodInfoResult.val;
+
+    const deserializedArgs: Either.Either<any[], string> = deserializeDataValue(
+      methodArgs,
+      methodInfo.paramTypes,
+    );
+
+    if (Either.isLeft(deserializedArgs)) {
+      return {
+        tag: 'err',
+        val: invalidInput(
+          `Failed to deserialize arguments for method ${methodName} in agent ${this.agentClassName.value}: ${deserializedArgs.val}`,
+        ),
+      };
+    }
+
+    const methodResult = await methodInfo.method.apply(
+      this.agentInstance,
+      deserializedArgs.val,
+    );
+
+    // Converting the result from the method back to data-value
+    const dataValueEither = serializeToDataValue(
+      methodResult,
+      methodInfo.returnType,
+    );
+
+    if (Either.isLeft(dataValueEither)) {
+      return {
+        tag: 'err',
+        val: createCustomError(
+          `Failed to serialize the return value from ${methodName}: ${dataValueEither.val}`,
+        ),
+      };
+    }
+
+    return {
+      tag: 'ok',
+      val: dataValueEither.val,
+    };
+  }
+
+  private getMethodParameterMetadata(
+    methodName: string,
+  ): Result<Map<string, AgentMethodParamMetadata>, AgentError> {
+    if (!this.parameterMetadata) {
+      this.parameterMetadata = AgentMethodParamRegistry.get(
+        this.agentClassName.value,
+      );
+    }
+
+    const methodParameterMetadata =
+      this.parameterMetadata!.get(methodName) ?? new Map();
+
+    return {
+      tag: 'ok',
+      val: methodParameterMetadata,
+    };
+  }
+
+  private getMethodMetadata(): Result<
+    Map<string, AgentMethodMetadata>,
+    AgentError
+  > {
+    if (!this.methodMetadata) {
+      const methodMetadata = AgentMethodRegistry.get(this.agentClassName.value);
+      if (!methodMetadata) {
+        AgentMethodRegistry.debugDump();
+        return {
+          tag: 'err',
+          val: invalidMethod(
+            `Failed to retrieve method metadata for agent ${this.agentClassName.value}.`,
+          ),
+        };
+      }
+      this.methodMetadata = methodMetadata;
+    }
+    return {
+      tag: 'ok',
+      val: this.methodMetadata!,
+    };
+  }
+
+  private getCachedMethodInfo(
+    methodName: string,
+  ): Result<CachedMethodInfo, AgentError> {
+    const cachedInfo = this.cachedMethodInfo.get(methodName);
+    if (cachedInfo) {
+      return {
+        tag: 'ok',
+        val: cachedInfo,
+      };
+    } else {
+      const agentMethod = (this.agentInstance as any)[methodName];
+
+      if (!agentMethod) {
+        return {
+          tag: 'err',
+          val: invalidMethod(
+            `Method ${methodName} not found on agent ${this.agentClassName.value}`,
+          ),
+        };
+      }
+
+      const parameterMetadata = this.getMethodParameterMetadata(methodName);
+      if (parameterMetadata.tag === 'err') {
+        return parameterMetadata;
+      }
+
+      const paramTypes = [];
+      for (const [paramName, paramMeta] of parameterMetadata.val) {
+        if (!paramMeta.typeInfo) {
+          return {
+            tag: 'err',
+            val: invalidType(
+              `Unsupported parameter ${paramName} in method ${methodName} of agent ${this.agentClassName.value}`,
+            ),
+          };
+        }
+        paramTypes.push({
+          name: paramName,
+          type: paramMeta.typeInfo,
+        });
+      }
+
+      const methodMetadata = this.getMethodMetadata();
+      if (methodMetadata.tag === 'err') {
+        return methodMetadata;
+      }
+
+      const method = methodMetadata.val.get(methodName);
+      const returnType = method?.returnType;
+
+      if (!returnType) {
+        return {
+          tag: 'err',
+          val: invalidType(
+            `Return type of method ${methodName} in agent ${this.agentClassName.value} is not supported.`,
+          ),
+        };
+      }
+
+      const methodInfo = {
+        paramTypes,
+        returnType,
+        method: agentMethod,
+      };
+      this.cachedMethodInfo.set(methodName, methodInfo);
+
+      return {
+        tag: 'ok',
+        val: methodInfo,
+      };
+    }
   }
 }
+
+type CachedMethodInfo = {
+  paramTypes: ParameterDetail[];
+  returnType: TypeInfoInternal;
+  method: any;
+};

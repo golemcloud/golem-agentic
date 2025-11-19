@@ -18,6 +18,7 @@ import { AgentTypeRegistry } from './internal/registry/agentTypeRegistry';
 import * as Option from './newTypes/option';
 import { AgentClassName } from './newTypes/agentClassName';
 import { Datetime } from 'golem:rpc/types@0.2.2';
+import { Uuid } from 'golem:agent/host';
 
 /**
  * BaseAgent is the foundational class for defining agent implementations.
@@ -40,6 +41,9 @@ import { Datetime } from 'golem:rpc/types@0.2.2';
  * ```
  */
 export class BaseAgent {
+  readonly agentClassName = new AgentClassName(this.constructor.name);
+  cachedAgentType: AgentType | undefined = undefined;
+
   /**
    * Returns the unique `AgentId` for this agent instance.
    *
@@ -55,6 +59,14 @@ export class BaseAgent {
   }
 
   /**
+   * Returns this agent's phantom ID, if any
+   */
+  phantomId(): Uuid | undefined {
+    const [_typeName, _params, phantomId] = this.getId().parsed();
+    return phantomId;
+  }
+
+  /**
    * Returns the `AgentType` metadata registered for this agent.
    *
    * This information is retrieved from the runtime agent registry and reflects
@@ -63,18 +75,19 @@ export class BaseAgent {
    * @throws Will throw if metadata is missing or the agent is not properly registered.
    */
   getAgentType(): AgentType {
-    const agentClassName = new AgentClassName(this.constructor.name);
+    if (!this.cachedAgentType) {
+      const agentType = AgentTypeRegistry.get(this.agentClassName);
 
-    const agentType = AgentTypeRegistry.get(agentClassName);
+      if (Option.isNone(agentType)) {
+        throw new Error(
+          `Agent type metadata is not available for \`${this.constructor.name}\`. ` +
+            `Ensure the class is decorated with @agent()`,
+        );
+      }
 
-    if (Option.isNone(agentType)) {
-      throw new Error(
-        `Agent type metadata is not available for \`${this.constructor.name}\`. ` +
-          `Ensure the class is decorated with @agent()`,
-      );
+      this.cachedAgentType = agentType.val;
     }
-
-    return agentType.val;
+    return this.cachedAgentType;
   }
 
   /**
@@ -127,6 +140,17 @@ export class BaseAgent {
    *
    */
   static get<T extends new (...args: any[]) => BaseAgent>(
+    this: T,
+    ...args: ConstructorParameters<T>
+  ): WithRemoteMethods<InstanceType<T>> {
+    throw new Error(
+      `Remote client creation failed: \`${this.name}\` must be decorated with @agent()`,
+    );
+  }
+
+  static phantom<
+    T extends new (phantomId: Uuid | undefined, ...args: any[]) => BaseAgent,
+  >(
     this: T,
     ...args: ConstructorParameters<T>
   ): WithRemoteMethods<InstanceType<T>> {

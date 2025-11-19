@@ -43,9 +43,10 @@ import {
   InterfaceWithUnionWithUndefined4,
   InterfaceWithOption,
 } from './testTypes';
+import { describe } from 'vitest';
 
 @agent()
-class FooAgent extends BaseAgent {
+export class FooAgent extends BaseAgent {
   constructor(readonly input: string) {
     super();
     this.input = input;
