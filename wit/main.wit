@@ -35,6 +35,8 @@ world agent-guest {
   import golem:web-search/types@1.0.0;
   import golem:web-search/web-search@1.0.0;
 
+  import wasi:cli/environment@0.2.3;
+
   import wasi:blobstore/blobstore;
   import wasi:blobstore/container;
   import wasi:blobstore/types;
