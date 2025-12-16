@@ -10,6 +10,10 @@ on:
 env:
   WASM_RQUICKJS_VERSION: "0.0.22"
 
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
 jobs:
   build-ts-agentic:
     runs-on: blacksmith
@@ -81,15 +85,18 @@ jobs:
 
   publish-ts-agentic:
     needs: build-ts-agentic
-    runs-on: blacksmith
+    runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/golem-ts-agentic-v')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v4
         with:
           node-version: "20.x"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Update npm
+        run: npm install -g npm@latest
 
       - uses: pnpm/action-setup@v2
         with:
