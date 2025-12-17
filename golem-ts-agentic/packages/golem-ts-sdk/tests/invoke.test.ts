@@ -451,6 +451,32 @@ test('Invoke function that takes and returns inbuilt result type', () => {
   );
 });
 
+test('Invoke function that takes and returns custom result type with void', () => {
+  overrideSelfAgentId(new AgentId('foo-agent()'));
+  const classMetadata = TypeMetadata.get(FooAgentClassName.value);
+  if (!classMetadata) {
+    throw new Error('FooAgent type metadata not found');
+  }
+
+  const resolvedAgent = initiateFooAgent('foo', classMetadata);
+
+  testInvoke(
+    'fun43',
+    [['param', { tag: 'ok', okValue: undefined }]],
+    resolvedAgent,
+    { tag: 'ok', okValue: undefined },
+    false,
+  );
+
+  testInvoke(
+    'fun43',
+    [['param', { tag: 'err', errValue: undefined }]],
+    resolvedAgent,
+    { tag: 'err', errValue: undefined },
+    false,
+  );
+});
+
 test('Invoke function that takes and returns inbuilt result type with void', () => {
   overrideSelfAgentId(new AgentId('foo-agent()'));
   const classMetadata = TypeMetadata.get(FooAgentClassName.value);

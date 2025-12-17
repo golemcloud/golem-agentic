@@ -43,6 +43,7 @@ import {
   InterfaceWithUnionWithUndefined3,
   InterfaceWithUnionWithUndefined4,
   InterfaceWithOption,
+  ResultTypeNonExact3,
 } from './testTypes';
 import { describe } from 'vitest';
 
@@ -277,6 +278,10 @@ export class FooAgent extends BaseAgent {
     optional: number | undefined,
   ): Promise<{ required: string; optional?: number }> {
     return { required, optional };
+  }
+
+  async fun43(param: ResultTypeNonExact3): Promise<ResultTypeNonExact3> {
+    return param;
   }
 
   // Overridden methods should be  not be considered as agent methods
