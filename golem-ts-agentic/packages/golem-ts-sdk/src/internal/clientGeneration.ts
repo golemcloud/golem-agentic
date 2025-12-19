@@ -38,7 +38,6 @@ import { AgentConstructorParamRegistry } from './registry/agentConstructorParamR
 import { AgentMethodRegistry } from './registry/agentMethodRegistry';
 import { deserialize } from './mapping/values/deserializer';
 import {
-  matchesType,
   serializeBinaryReferenceTsValue,
   serializeDefaultTsValue,
   serializeTextReferenceTsValue,
@@ -50,10 +49,12 @@ import {
   createSingleElementTupleDataValue,
   deserializeDataValue,
   ParameterDetail,
+  serializeToDataValue,
 } from './mapping/values/dataValue';
 import { randomUuid } from '../host/hostapi';
 import { convertAgentMethodNameToKebab } from './mapping/types/stringFormat';
 import { AgentId } from '../agentId';
+import * as util from 'node:util';
 
 export function getRemoteClient<T extends new (...args: any[]) => any>(
   agentClassName: AgentClassName,
@@ -181,6 +182,33 @@ class WasmRpxProxyHandlerShared {
 
   constructAgentId(args: any[], phantomId?: Uuid): wasmRpc.AgentId {
     const registeredAgentType = this.getRegisteredAgentType();
+
+    if (
+      args.length === 1 &&
+      this.constructorParamTypes[0].tag === 'multimodal'
+    ) {
+      const dataValueEither = serializeToDataValue(
+        args[0],
+        this.constructorParamTypes[0],
+      );
+
+      if (Either.isLeft(dataValueEither)) {
+        throw new Error(
+          `Failed to serialize multimodal constructor argument: ${dataValueEither.val}. Input is ${util.format(args)}`,
+        );
+      }
+
+      const agentId = makeAgentId(
+        this.agentClassName.value,
+        dataValueEither.val,
+        phantomId,
+      );
+
+      return {
+        componentId: registeredAgentType.implementedBy,
+        agentId: agentId,
+      };
+    }
 
     const elementValues: ElementValue[] = [];
     for (const [index, arg] of args.entries()) {
@@ -401,12 +429,14 @@ class WasmRpcProxyHandler implements ProxyHandler<any> {
       );
 
       const rpcResultPollable = rpcResultFuture.subscribe();
+
       await rpcResultPollable.promise();
 
       const rpcResult = rpcResultFuture.get();
+
       if (!rpcResult) {
         throw new Error(
-          `Failed to invoke ${methodInfo.name} in agent ${agentId.agentId}`,
+          `RPC to remote agent failed. Failed to invoke ${methodInfo.name} in agent ${agentId.agentId}`,
         );
       }
 
@@ -414,7 +444,8 @@ class WasmRpcProxyHandler implements ProxyHandler<any> {
         rpcResult.tag === 'err'
           ? (() => {
               throw new Error(
-                'Failed to invoke: ' + JSON.stringify(rpcResult.val),
+                'Remote agent returned error result: ' +
+                  JSON.stringify(rpcResult.val),
               );
             })()
           : rpcResult.val;
@@ -590,7 +621,7 @@ function deserializeRpcResult(
       )[0];
 
     case 'multimodal':
-      const multimodalParamInfo: ParameterDetail[] = typeInfoInternal.types;
+      const multimodalParamsInfo: ParameterDetail[] = typeInfoInternal.types;
 
       switch (rpcResult.kind) {
         // A multimodal value is always a list
@@ -602,7 +633,7 @@ function deserializeRpcResult(
               switch (value.kind) {
                 case 'variant':
                   const caseIdx = value.caseIdx;
-                  const paramDetail = multimodalParamInfo[caseIdx];
+                  const paramDetail = multimodalParamsInfo[caseIdx];
                   const caseValue = value.caseValue;
 
                   if (!caseValue) {
@@ -632,7 +663,12 @@ function deserializeRpcResult(
           };
 
           return Either.getOrThrowWith(
-            deserializeDataValue(dataValue, multimodalParamInfo),
+            deserializeDataValue(dataValue, [
+              {
+                name: 'return-value',
+                type: typeInfoInternal,
+              },
+            ]),
             (err) =>
               new Error(
                 `Failed to deserialize multimodal return value: ${err}`,
@@ -713,13 +749,15 @@ function convertValueToTextReference(value: Value.Value): TextReference {
             case 'record':
               const record = inlineValue.value;
               const data = record[0];
-              const languageCode = record.length > 1 ? record[1] : undefined;
+              const languageCodeField =
+                record.length > 1 ? record[1] : undefined;
 
               switch (data.kind) {
                 case 'string':
                   const textData = data.value;
 
-                  if (!languageCode) {
+                  // The languageCode field doesn't exist at all
+                  if (!languageCodeField) {
                     return {
                       tag: 'inline',
                       val: {
@@ -728,20 +766,40 @@ function convertValueToTextReference(value: Value.Value): TextReference {
                     };
                   }
 
-                  switch (languageCode.kind) {
-                    case 'string':
-                      const languageCodeStr = languageCode.value;
-                      return {
-                        tag: 'inline',
-                        val: {
-                          data: textData,
-                          textType: { languageCode: languageCodeStr },
-                        },
-                      };
+                  switch (languageCodeField.kind) {
+                    case 'option':
+                      const langCodeOpt = languageCodeField.value;
+
+                      // The languageCode field exists; however, it's None
+                      if (!langCodeOpt) {
+                        return {
+                          tag: 'inline',
+                          val: {
+                            data: textData,
+                          },
+                        };
+                      }
+
+                      switch (langCodeOpt.kind) {
+                        case 'string':
+                          const languageCodeStrOpt = langCodeOpt.value;
+                          return {
+                            tag: 'inline',
+                            val: {
+                              data: textData,
+                              textType: { languageCode: languageCodeStrOpt },
+                            },
+                          };
+
+                        default:
+                          throw new Error(
+                            `Invalid inline text language code option type: expected string, found ${JSON.stringify(langCodeOpt)}`,
+                          );
+                      }
 
                     default:
                       throw new Error(
-                        `Invalid inline text language code type: expected string`,
+                        `Invalid inline text language code type: expected string, found ${languageCodeField.kind}`,
                       );
                   }
 
